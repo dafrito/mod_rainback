@@ -1,1 +1,3 @@
 libservermod.so
+servermod.spec
+rpm.sh

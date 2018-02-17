@@ -1,0 +1,30 @@
+Name: @PACKAGE_NAME@
+
+Version:	@PACKAGE_VERSION@
+Release:	@PACKAGE_RELEASE@%{?dist}
+Summary: servermod module for Parsegraph
+
+License:	Apache license 2.0
+URL:		@PACKAGE_URL@
+Source0:	@PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz
+BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+BuildArch:	x86_64
+Requires:   apr-devel
+
+%description
+Module that provides the Marla routes for Parsegraph.
+
+%prep
+%setup -q
+
+%build
+make
+
+%check
+
+%install
+mkdir -p %{buildroot}/%{_libdir}
+cp libservermod.so %{buildroot}/%{_libdir}
+
+%files
+%{_libdir}/libservermod.so
