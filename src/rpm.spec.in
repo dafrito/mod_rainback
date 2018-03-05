@@ -2,7 +2,7 @@ Name: @PACKAGE_NAME@
 
 Version:	@PACKAGE_VERSION@
 Release:	@PACKAGE_RELEASE@%{?dist}
-Summary: servermod module for Parsegraph
+Summary: rainback.com HTML
 
 License:	Apache license 2.0
 URL:		@PACKAGE_URL@
@@ -12,7 +12,7 @@ BuildArch:	x86_64
 Requires:   apr-devel
 
 %description
-Module that provides the Marla routes for Parsegraph.
+Module with Marla HTML routes for rainback.com.
 
 %prep
 %setup -q
@@ -24,7 +24,7 @@ make
 
 %install
 mkdir -p %{buildroot}/%{_libdir}
-cp libservermod.so %{buildroot}/%{_libdir}
+cp mod_rainback.so %{buildroot}/%{_libdir}
 
 %files
-%{_libdir}/libservermod.so
+%{_libdir}/mod_rainback.so

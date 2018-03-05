@@ -5,25 +5,28 @@ INCLUDEDIR=$(PREFIX)/include
 USER=$(shell whoami)
 UID=$(shell id -u `whoami`)
 GID=$(shell id -g `whoami`)
-PACKAGE_NAME=servermod
+PACKAGE_NAME=mod_rainback
 PACKAGE_VERSION=1.0
-PACKAGE_RELEASE=21
+PACKAGE_RELEASE=30
 PACKAGE_URL=rainback.com
 build_cpu=x86_64
 
 CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -laprutil-1 -fPIC -L$(HOME)/lib -lparsegraph_user -lparsegraph_List -lparsegraph_environment
 
-all: libservermod.so
+all: mod_rainback.so
 .PHONY: all
 
-libservermod.so: servermod.c
-	$(CC) -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` -I"../src" $^
+SOURCES=src/module.c src/route.c src/counter.c src/contact.c src/about.c src/import.c src/search.c src/auth.c
+HEADERS=src/mod_rainback.h
+
+mod_rainback.so: $(SOURCES)
+	$(CC) -I src -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` $^
 
 clean:
-	rm -f libservermod.so
+	rm -f mod_rainback.so $(PACKAGE_NAME).spec rpm.sh $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz
 .PHONY: clean
 
-rpm.sh: rpm.sh.in
+rpm.sh: src/rpm.sh.in
 	cp -f $< $@-wip
 	sed -i -re 's/@PACKAGE_NAME@/$(PACKAGE_NAME)/g' $@-wip
 	sed -i -re 's/@PACKAGE_VERSION@/$(PACKAGE_VERSION)/g' $@-wip
@@ -31,7 +34,7 @@ rpm.sh: rpm.sh.in
 	mv $@-wip $@
 	chmod +x rpm.sh
 
-$(PACKAGE_NAME).spec: rpm.spec.in
+$(PACKAGE_NAME).spec: src/rpm.spec.in
 	cp -f $< $@-wip
 	sed -i -re 's/@PACKAGE_NAME@/$(PACKAGE_NAME)/g' $@-wip
 	sed -i -re 's/@PACKAGE_VERSION@/$(PACKAGE_VERSION)/g' $@-wip
@@ -42,7 +45,7 @@ $(PACKAGE_NAME).spec: rpm.spec.in
 	sed -i -re 's/@build_cpu@/$(build_cpu)/g' $@-wip
 	mv $@-wip $@
 
-$(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz: servermod.c Makefile
+$(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz: $(SOURCES) $(HEADERS) Makefile
 	tar --transform="s'^'$(PACKAGE_NAME)-$(PACKAGE_VERSION)/'g" -cz -f $@ $^
 
 dist-gzip: $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz $(PACKAGE_NAME).spec
