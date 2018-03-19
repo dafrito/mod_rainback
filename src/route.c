@@ -1,6 +1,6 @@
 #include "mod_rainback.h"
 
-static int handleSearch(marla_Request* req)
+/*static int handleSearch(marla_Request* req, mod_rainback* rb)
 {
     if(strncmp(req->uri, "/search", strlen("/search"))) {
         return 1;
@@ -30,43 +30,58 @@ static int handleSearch(marla_Request* req)
         }
     }
 
-    struct marla_ChunkedPageRequest* cpr;
-    cpr = marla_ChunkedPageRequest_new(marla_BUFSIZE, req);
-    cpr->handler = makeSearchPage;
-    req->handler = marla_chunkedRequestHandler;
-    req->handlerData = cpr;
+    req->handler = rainback_searchHandler;
     return 0;
 }
+*/
 
-void routeHook(struct marla_Request* req, void* hookData)
+void mod_rainback_route(struct marla_Request* req, void* hookData)
 {
+    mod_rainback* rb = hookData;
     struct marla_ChunkedPageRequest* cpr;
-    if(handleSearch(req) == 0) {
+    if(!strcmp(req->uri, "/")) {
+        req->handler = rainback_homepageHandler;
+        req->handlerData = rainback_HomepageResponse_new(req, rb);
         return;
     }
-    if(!strcmp(req->uri, "/contact")) {
-        cpr = marla_ChunkedPageRequest_new(marla_BUFSIZE, req);
-        cpr->handler = makeContactPage;
-        req->handler = marla_chunkedRequestHandler;
-        req->handlerData = cpr;
+    if(!strcmp(req->uri, "/login") || !strcmp(req->uri, "/login/")) {
+        req->handler = rainback_loginHandler;
+        req->handlerData = rainback_LoginResponse_new(req, rb);
         return;
     }
-    if(!strcmp(req->uri, "/profile")) {
+    if(!strcmp(req->uri, "/logout") || !strcmp(req->uri, "/logout/")) {
+        req->handler = rainback_logoutHandler;
+        req->handlerData = rainback_LogoutResponse_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/signup") || !strcmp(req->uri, "/signup/")) {
+        req->handler = rainback_signupHandler;
+        req->handlerData = rainback_SignupResponse_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/profile") || !strcmp(req->uri, "/profile/")) {
         req->handler = rainback_profileHandler;
+        req->handlerData = rainback_ProfileResponse_new(rb);
         return;
     }
-    if(!strcmp(req->uri, "/import")) {
-        req->handler = rainback_importHandler;
-        return;
-    }
-    if(!strncmp(req->uri, "/user", 5)) {
+    /*if(!strncmp(req->uri, "/user", 5)) {
         // Check for suitable termination
         if(req->uri[5] != 0 && req->uri[5] != '/' && req->uri[5] != '?') {
             // Not really handled.
             return;
         }
-        // Install backend handler.
-        req->handler = marla_backendClientHandler;
+        req->handler = rainback_userHandler;
+        req->handlerData = rainback_UserHandlerData_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/contact")) {
+        req->handler = rainback_contactHandler;
+        req->handlerData = rainback_ContactHandlerData_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/import")) {
+        req->handler = rainback_importHandler;
+        req->handlerData = rainback_ImportHandlerData_new(req, rb);
         return;
     }
     int len = strlen("/environment");
@@ -76,67 +91,31 @@ void routeHook(struct marla_Request* req, void* hookData)
             // Not really handled.
             return;
         }
-        // Install backend handler.
-        req->handler = marla_backendClientHandler;
+        if(req->uri[len] == '/' && req->uri[len + 1] == 0) {
+            req->handler = rainback_environmentHandler;
+            req->handlerData = rainback_EnvironmentHandlerData_new(req, rb);
+        }
+        // Not really handled.
         return;
     }
-
-    const char* bufs[] = {
-        "/parsegraph-1.2.js",
-        "/parsegraph-widgets-1.2.js",
-        "/parsegraph-1.0.js",
-        "/parsegraph-widgets-1.0.js",
-        "/sga.css",
-        "/UnicodeData.txt",
-        "/chat.html",
-        "/float.html",
-        "/woodwork.html",
-        "/GLWidget.js",
-        "/bible.html",
-        "/primes.html",
-        "/corporate.html",
-        "/alpha.html",
-        "/weetcubes.html",
-        "/week.html",
-        "/calendar.html",
-        "/ulam.html",
-        "/piers.html",
-        "/lisp.html",
-        "/anthonylispjs-1.0.js",
-        "/chess.html",
-        "/ip.html",
-        "/todo.html",
-        "/start.html",
-        "/multislot.html",
-        "/esprima.js",
-        "/finish.html",
-        "/surface.lisp",
-        "/terminal.html",
-        "/initial.html",
-        "/javascript.html",
-        "/builder.html",
-        "/htmlgraph.html",
-        "/audio.html",
-        "/favicon.ico",
-        "/list-bullet.png",
-        "/logo.png",
-        0
-    };
-    for(int i = 0; ; ++i) {
-        const char* path = bufs[i];
-        if(!path) {
-            break;
-        }
-        if(!strncmp(req->uri, path, strlen(path))) {
-            // Install backend handler.
-            req->handler = marla_backendClientHandler;
-            return;
-        }
+    if(handleSearch(req, rb) == 0) {
+        return;
     }
+    if(!strcmp(req->uri, "/payment")) {
+        req->handler = rainback_paymentHandler;
+        req->handlerData = rainback_PaymentHandlerData_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/profile")) {
+        req->handler = rainback_profileHandler;
+        req->handlerData = rainback_ProfileResponse_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/subscribe")) {
+        req->handler = rainback_subscribeHandler;
+        req->handlerData = rainback_SubscribeHandlerData_new(req, rb);
+        return;
+    }*/
 
-    // Default handler.
-    cpr = marla_ChunkedPageRequest_new(marla_BUFSIZE, req);
-    cpr->handler = makeCounterPage;
-    req->handler = marla_chunkedRequestHandler;
-    req->handlerData = cpr;
+    req->handler = marla_backendClientHandler;
 }

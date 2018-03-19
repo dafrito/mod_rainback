@@ -2,7 +2,7 @@
 #include <parsegraph_user.h>
 #include <apr_pools.h>
 
-int rainback_processCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t* dbd, parsegraph_user_login* login, char* cookie)
+int rainback_authenticateByCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t* dbd, parsegraph_user_login* login, char* cookie)
 {
     int cookie_len = strlen(cookie);
     int cookieType = 0;
@@ -37,19 +37,21 @@ int rainback_processCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t* dbd, 
             if(sessionValue && 0 == parsegraph_deconstructSessionString(pool, sessionValue, &login->session_selector, &login->session_token)) {
                 parsegraph_UserStatus rv = parsegraph_refreshUserLogin(pool, dbd, login);
                 if(rv != parsegraph_OK) {
-                    marla_killRequest(req, "Failed to refresh session's login: %s", parsegraph_nameUserStatus(rv));
-                    return 1;
+                    if(parsegraph_isSeriousUserError(rv)) {
+                        marla_killRequest(req, "Failed to refresh session's login: %s", parsegraph_nameUserStatus(rv));
+                    }
+                    return 2;
                 }
 
                 parsegraph_UserStatus idRV = parsegraph_getIdForUsername(pool, dbd, login->username, &(login->userId));
                 if(parsegraph_isSeriousUserError(idRV)) {
                     marla_killRequest(req, "Failed to retrieve ID for authenticated login.");
-                    return 1;
+                    return 2;
                 }
             }
             if(!login->username) {
-                marla_killRequest(req, "Session does not match any user.");
-                return 1;
+                marla_logMessage(req->cxn->server, "Session does not match any user.");
+                return 2;
             }
             marla_logMessagef(req->cxn->server, "Session matched user %s", login->username);
             return 0;

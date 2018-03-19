@@ -1,5 +1,10 @@
 #include "mod_rainback.h"
 
+rainback_ContactHandlerData* rainback_contactHandlerData_new(marla_Request* req, mod_rainback* rb)
+{
+
+}
+
 marla_WriteResult makeContactPage(struct marla_ChunkedPageRequest* cpr)
 {
     char buf[4096];
@@ -286,4 +291,3 @@ marla_WriteResult makeContactPage(struct marla_ChunkedPageRequest* cpr)
 
     return marla_WriteResult_CONTINUE;
 }
-

@@ -16,7 +16,8 @@ CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -l
 all: mod_rainback.so
 .PHONY: all
 
-SOURCES=src/module.c src/route.c src/counter.c src/contact.c src/about.c src/import.c src/search.c src/auth.c
+SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c
+#SOURCES=src/module.c src/route.c src/auth.c src/contact.c src/homepage.c src/user.c src/user_json.c src/import.c src/search.c src/environment.c src/payment.c src/profile.c src/subscribe.c
 HEADERS=src/mod_rainback.h
 
 mod_rainback.so: $(SOURCES)
@@ -25,6 +26,13 @@ mod_rainback.so: $(SOURCES)
 clean:
 	rm -f mod_rainback.so $(PACKAGE_NAME).spec rpm.sh $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz
 .PHONY: clean
+
+check: mod_rainback.so runtest
+	./runtest
+.PHONY: check
+
+runtest: src/runtest.c
+	$(CC) -I src -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` $^
 
 rpm.sh: src/rpm.sh.in
 	cp -f $< $@-wip
