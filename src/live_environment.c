@@ -18,8 +18,8 @@ struct parsegraph_live_session {
 
 int openWorldStreams = 0;
 
-static int acquireWorldStream();
-static int releaseWorldStream(int commit);
+int mod_rainback_acquireWorldStream(mod_rainback* rb);
+int mod_rainback_releaseWorldStream(mod_rainback* rb, int commit);
 
 static void
 callback_parsegraph_environment(struct marla_Request* req, enum marla_ClientEvent reason, void *in, int len)
@@ -37,7 +37,7 @@ callback_parsegraph_environment(struct marla_Request* req, enum marla_ClientEven
             if(resp->initialData->stage != 3 && !resp->initialData->error) {
                 // World streaming interrupted, decrement usage counter.
                 resp->initialData->error = 1;
-                if(releaseWorldStream(1) != 0) {
+                if(mod_rainback_releaseWorldStream(resp->rb, 1) != 0) {
                     return;
                 }
             }
@@ -171,7 +171,7 @@ callback_parsegraph_environment(struct marla_Request* req, enum marla_ClientEven
             goto choked;
         }
         if(!resp->initialData) {
-            if(0 != acquireWorldStream()) {
+            if(0 != mod_rainback_acquireWorldStream(resp->rb)) {
                 strcpy(resp->error, "Failed to begin transaction to initialize user.");
                 goto choked;
             }
@@ -202,8 +202,8 @@ callback_parsegraph_environment(struct marla_Request* req, enum marla_ClientEven
             switch(parsegraph_printItem(req, resp, resp->initialData)) {
             case 0:
                 // Done!
-                if(releaseWorldStream(1) != 0) {
-                    releaseWorldStream(0);
+                if(mod_rainback_releaseWorldStream(resp->rb, 1) != 0) {
+                    mod_rainback_releaseWorldStream(resp->rb, 0);
                     resp->initialData->error = 1;
                     strcpy(resp->error, "Failed to commit prepared environment.");
                     goto choked;
@@ -223,7 +223,7 @@ callback_parsegraph_environment(struct marla_Request* req, enum marla_ClientEven
             case -2:
             default:
                 // Died.
-                releaseWorldStream(0);
+                mod_rainback_releaseWorldStream(resp->rb, 0);
                 resp->initialData->error = 1;
                 strcpy(resp->error, "Failed to prepare environment.");
                 goto choked;
@@ -273,33 +273,11 @@ void rainback_live_environment_install(mod_rainback* rb, marla_Request* req)
     }
 }
 
-static int destroy_module(struct marla_Server* server)
-{
-    // Close the world streaming DBD connection.
-    int rv = apr_dbd_close(worldStreamDBD->driver, worldStreamDBD->handle);
-    if(rv != APR_SUCCESS) {
-        fprintf(stderr, "Failed closing world streaming database connection, APR status of %d.\n", rv);
-        return -1;
-    }
-
-    // Close the control DBD connection.
-    rv = apr_dbd_close(controlDBD->driver, controlDBD->handle);
-    if(rv != APR_SUCCESS) {
-        fprintf(stderr, "Failed closing control database connection, APR status of %d.\n", rv);
-        return -1;
-    }
-
-    apr_pool_destroy(modpool);
-    modpool = NULL;
-
-    return 0;
-}
-
-static int acquireWorldStream()
+int mod_rainback_acquireWorldStream(mod_rainback* rb)
 {
     if(openWorldStreams++ == 0) {
         int nrows;
-        int dbrv = apr_dbd_query(worldStreamDBD->driver, worldStreamDBD->handle, &nrows, "BEGIN IMMEDIATE");
+        int dbrv = apr_dbd_query(rb->worldSession->dbd->driver, rb->worldSession->dbd->handle, &nrows, "BEGIN IMMEDIATE");
         if(dbrv != 0) {
             openWorldStreams = 0;
             return -1;
@@ -308,7 +286,7 @@ static int acquireWorldStream()
     return 0;
 }
 
-static int releaseWorldStream(int commit)
+int mod_rainback_releaseWorldStream(mod_rainback* rb, int commit)
 {
     if(openWorldStreams == 0) {
         // Invalid.
@@ -319,7 +297,7 @@ static int releaseWorldStream(int commit)
     }
 
     int nrows;
-    int dbrv = apr_dbd_query(worldStreamDBD->driver, worldStreamDBD->handle, &nrows, commit ? "COMMIT" : "ROLLBACK");
+    int dbrv = apr_dbd_query(rb->worldSession->dbd->driver, rb->worldSession->dbd->handle, &nrows, commit ? "COMMIT" : "ROLLBACK");
     if(dbrv != 0) {
         return -1;
     }
@@ -332,11 +310,6 @@ int cb_get_data_version(void* userdata, int numCols, char** values, char** colum
     strncpy(data_version_storage, values[0], 254);
     fprintf(stderr, values[0]);
     return 0;
-}
-
-void run_conn_sql(const char* sql)
-{
-    sqlite3_exec(apr_dbd_native_handle(controlDBD->driver, controlDBD->handle), sql, cb_get_data_version, 0, 0);
 }
 
 int initialize_parsegraph_live_session(parsegraph_live_session* session, mod_rainback* rb)

@@ -154,10 +154,6 @@ rainback_Page* rainback_getKilledPage(mod_rainback* rb, const char* reason, cons
 #define MAX_MESSAGE_QUEUE 512
 #define MAX_INIT_LENGTH 4096
 
-extern apr_pool_t* modpool;
-extern ap_dbd_t* controlDBD;
-extern ap_dbd_t* worldStreamDBD;
-
 typedef struct a_message {
     void *payload;
     size_t len;
@@ -192,5 +188,8 @@ int initialize_parsegraph_live_session(parsegraph_live_session* session, mod_rai
 int parsegraph_printItem(marla_Request* req, parsegraph_live_session* session, struct printing_item* level);
 int parsegraph_prepareEnvironment(parsegraph_live_session* session);
 void rainback_live_environment_install(mod_rainback* rb, marla_Request* req);
+
+int mod_rainback_acquireWorldStream(mod_rainback* rb);
+int mod_rainback_releaseWorldStream(mod_rainback* rb, int commit);
 
 #endif // mod_rainback_INCLUDED
