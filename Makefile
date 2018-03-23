@@ -7,21 +7,21 @@ UID=$(shell id -u `whoami`)
 GID=$(shell id -g `whoami`)
 PACKAGE_NAME=mod_rainback
 PACKAGE_VERSION=1.0
-PACKAGE_RELEASE=30
+PACKAGE_RELEASE=31
 PACKAGE_URL=rainback.com
 build_cpu=x86_64
 
-CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -laprutil-1 -fPIC -L$(HOME)/lib -lparsegraph_user -lparsegraph_List -lparsegraph_environment
+CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -laprutil-1 -fPIC -L$(HOME)/lib -lparsegraph
 
 all: mod_rainback.so
 .PHONY: all
 
-SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c
+SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/live_environment.c
 #SOURCES=src/module.c src/route.c src/auth.c src/contact.c src/homepage.c src/user.c src/user_json.c src/import.c src/search.c src/environment.c src/payment.c src/profile.c src/subscribe.c
 HEADERS=src/mod_rainback.h
 
-mod_rainback.so: $(SOURCES)
-	$(CC) -I src -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` $^
+mod_rainback.so: $(SOURCES) $(HEADERS)
+	$(CC) -I src -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` $(SOURCES) -L.. -lmarla
 
 clean:
 	rm -f mod_rainback.so $(PACKAGE_NAME).spec rpm.sh $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz

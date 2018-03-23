@@ -156,7 +156,7 @@ static marla_WriteResult readProfileForm(mod_rainback* rb, marla_Request* req, c
 
     rainback_Page* page = rainback_Page_new("");
 
-    switch(parsegraph_beginUserLogin(rb->pool, rb->dbd,
+    switch(parsegraph_beginUserLogin(rb->session,
         username, password,
         &login
     )) {
@@ -246,7 +246,7 @@ void rainback_profileHandler(struct marla_Request* req, enum marla_ClientEvent e
         if(strcmp("Cookie", data)) {
             break;
         }
-        rainback_authenticateByCookie(req, resp->rb->pool, resp->rb->dbd, &resp->login, data + dataLen);
+        rainback_authenticateByCookie(req, resp->rb, &resp->login, data + dataLen);
         break;
     case marla_EVENT_ACCEPTING_REQUEST:
         *((int*)data) = acceptRequest(req);

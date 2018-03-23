@@ -17,7 +17,7 @@ rainback_SignupResponse* rainback_SignupResponse_new(marla_Request* req, mod_rai
     rainback_SignupResponse* resp = malloc(sizeof(*resp));
     memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
-    if(apr_pool_create(&resp->pool, resp->rb->pool) != APR_SUCCESS) {
+    if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
         marla_killRequest(req, "Failed to create request handler memory pool.");
     }
     resp->input = marla_Ring_new(BUFSIZE);
@@ -309,12 +309,12 @@ static marla_WriteResult readSignupForm(mod_rainback* rb, marla_Request* req, ch
         rainback_generatedSignupPasswordDoesntMatchPage(page, rb, username);
     }
     else {
-        parsegraph_UserStatus rv = parsegraph_createNewUser(rb->pool, rb->dbd, username, password);
+        parsegraph_UserStatus rv = parsegraph_createNewUser(rb->session, username, password);
         if(rv != parsegraph_OK) {
             rainback_generateSignupFailedPage(page, rb, rv, username);
         }
         else {
-            switch(parsegraph_beginUserLogin(rb->pool, rb->dbd,
+            switch(parsegraph_beginUserLogin(rb->session,
                 username, password,
                 &login
             )) {
@@ -413,7 +413,7 @@ void rainback_signupHandler(struct marla_Request* req, enum marla_ClientEvent ev
         if(strcmp("Cookie", data)) {
             break;
         }
-        rainback_authenticateByCookie(req, resp->pool, resp->rb->dbd, &resp->login, data + dataLen);
+        rainback_authenticateByCookie(req, resp->rb, &resp->login, data + dataLen);
         break;
     case marla_EVENT_ACCEPTING_REQUEST:
         *((int*)data) = acceptRequest(req);

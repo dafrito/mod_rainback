@@ -15,7 +15,7 @@ rainback_HomepageResponse* rainback_HomepageResponse_new(marla_Request* req, mod
     rainback_HomepageResponse* resp = malloc(sizeof(*resp));
     memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
-    if(apr_pool_create(&resp->pool, resp->rb->pool) != APR_SUCCESS) {
+    if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
         marla_killRequest(req, "Failed to create request handler memory pool.");
     }
     resp->input = marla_Ring_new(BUFSIZE);
@@ -62,7 +62,7 @@ void rainback_homepageHandler(struct marla_Request* req, enum marla_ClientEvent 
         if(strcmp("Cookie", data)) {
             break;
         }
-        rainback_authenticateByCookie(req, resp->pool, resp->rb->dbd, &resp->login, data + dataLen);
+        rainback_authenticateByCookie(req, resp->rb, &resp->login, data + dataLen);
         break;
     case marla_EVENT_ACCEPTING_REQUEST:
         *((int*)data) = acceptRequest(req);

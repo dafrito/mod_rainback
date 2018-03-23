@@ -2,7 +2,7 @@
 #include <parsegraph_user.h>
 #include <apr_pools.h>
 
-int rainback_authenticateByCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t* dbd, parsegraph_user_login* login, char* cookie)
+int rainback_authenticateByCookie(marla_Request* req, mod_rainback* rb, parsegraph_user_login* login, char* cookie)
 {
     int cookie_len = strlen(cookie);
     int cookieType = 0;
@@ -34,8 +34,8 @@ int rainback_authenticateByCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t
             char* sessionValue = partTok;
             login->username = 0;
             login->userId = -1;
-            if(sessionValue && 0 == parsegraph_deconstructSessionString(pool, sessionValue, &login->session_selector, &login->session_token)) {
-                parsegraph_UserStatus rv = parsegraph_refreshUserLogin(pool, dbd, login);
+            if(sessionValue && 0 == parsegraph_deconstructSessionString(rb->session, sessionValue, &login->session_selector, &login->session_token)) {
+                parsegraph_UserStatus rv = parsegraph_refreshUserLogin(rb->session, login);
                 if(rv != parsegraph_OK) {
                     if(parsegraph_isSeriousUserError(rv)) {
                         marla_killRequest(req, "Failed to refresh session's login: %s", parsegraph_nameUserStatus(rv));
@@ -43,7 +43,7 @@ int rainback_authenticateByCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t
                     return 2;
                 }
 
-                parsegraph_UserStatus idRV = parsegraph_getIdForUsername(pool, dbd, login->username, &(login->userId));
+                parsegraph_UserStatus idRV = parsegraph_getIdForUsername(rb->session, login->username, &(login->userId));
                 if(parsegraph_isSeriousUserError(idRV)) {
                     marla_killRequest(req, "Failed to retrieve ID for authenticated login.");
                     return 2;

@@ -2,17 +2,24 @@
 #define mod_rainback_INCLUDED
 
 #include "marla.h"
+#include <parsegraph_Session.h>
 #include <parsegraph_user.h>
+#include <parsegraph_List.h>
+#include <parsegraph_environment.h>
 #include <apr_pools.h>
 #include <time.h>
+#include <string.h>
+#include <dlfcn.h>
+#include <apr_dso.h>
 
 struct mod_rainback {
-apr_pool_t* pool;
-ap_dbd_t* dbd;
+parsegraph_Session* session;
+parsegraph_Session* worldSession;
 apr_hash_t* cache;
-marla_Server* server;
 };
 typedef struct mod_rainback mod_rainback;
+mod_rainback* mod_rainback_new(marla_Server* server);
+void mod_rainback_destroy(mod_rainback* rb);
 
 struct rainback_Page {
 char* cacheKey;
@@ -31,6 +38,7 @@ int rainback_Page_write(rainback_Page* page, void* buf, size_t len);
 void rainback_Page_ref(rainback_Page* page);
 void rainback_Page_unref(rainback_Page* page);
 void rainback_Page_endHead(rainback_Page* page);
+void mod_rainback_eachPage(mod_rainback* rb, void(*visitor)(mod_rainback*, const char*, rainback_Page*, void*), void* visitorData);
 
 void mod_rainback_route(struct marla_Request* req, void* hookData);
 void mod_rainback_init(struct marla_Server* server, enum marla_ServerModuleEvent e);
@@ -89,7 +97,7 @@ void rainback_environmentHandler(struct marla_Request* req, enum marla_ClientEve
 void rainback_paymentHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int datalen);
 void rainback_subscribeHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int datalen);
 
-int rainback_authenticateByCookie(marla_Request* req, apr_pool_t* pool, ap_dbd_t* dbd, parsegraph_user_login* login, char* cookie);
+int rainback_authenticateByCookie(marla_Request* req, mod_rainback* rb, parsegraph_user_login* login, char* cookie);
 
 struct rainback_ContactHandlerData {
 mod_rainback* rb;
@@ -140,5 +148,49 @@ mod_rainback* rb;
 typedef struct rainback_SubscribeHandlerData rainback_SubscribeHandlerData;
 rainback_SubscribeHandlerData* rainback_SubscribeHandlerData_new(marla_Request* req, mod_rainback* rb);
 rainback_Page* rainback_getKilledPage(mod_rainback* rb, const char* reason, const char* url);
+
+#include "marla.h"
+
+#define MAX_MESSAGE_QUEUE 512
+#define MAX_INIT_LENGTH 4096
+
+extern apr_pool_t* modpool;
+extern ap_dbd_t* controlDBD;
+extern ap_dbd_t* worldStreamDBD;
+
+typedef struct a_message {
+    void *payload;
+    size_t len;
+} a_message;
+
+struct list_item_progress {
+    int listId;
+
+};
+
+struct printing_item {
+int stage;
+int error;
+parsegraph_List_item** values;
+size_t nvalues;
+int listId;
+struct printing_item* parentLevel;
+struct printing_item* nextLevel;
+size_t index;
+};
+
+struct parsegraph_live_session;
+typedef struct parsegraph_live_session parsegraph_live_session;
+
+typedef struct parsegraph_live_server {
+    apr_pool_t* pool;
+    a_message messages[MAX_MESSAGE_QUEUE];
+    int receiveHead;
+} parsegraph_live_server;
+
+int initialize_parsegraph_live_session(parsegraph_live_session* session, mod_rainback* rb);
+int parsegraph_printItem(marla_Request* req, parsegraph_live_session* session, struct printing_item* level);
+int parsegraph_prepareEnvironment(parsegraph_live_session* session);
+void rainback_live_environment_install(mod_rainback* rb, marla_Request* req);
 
 #endif // mod_rainback_INCLUDED

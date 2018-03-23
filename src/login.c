@@ -17,7 +17,7 @@ rainback_LoginResponse* rainback_LoginResponse_new(marla_Request* req, mod_rainb
     rainback_LoginResponse* resp = malloc(sizeof(*resp));
     memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
-    if(apr_pool_create(&resp->pool, resp->rb->pool) != APR_SUCCESS) {
+    if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
         marla_killRequest(req, "Failed to create request handler memory pool.");
     }
     resp->input = marla_Ring_new(BUFSIZE);
@@ -149,11 +149,11 @@ void rainback_generateAlreadyLoggedInPage(rainback_Page* page, mod_rainback* rb,
         "Location: /\r\n"
         "\r\n",
         bodylen,
-        parsegraph_constructSessionString(rb->pool,
+        parsegraph_constructSessionString(rb->session,
             login->session_selector,
             login->session_token
         ),
-        rb->server->using_ssl ? "Secure;" : ""
+        rb->session->server->using_ssl ? "Secure;" : ""
     );
     rainback_Page_write(page, buf, len);
     rainback_Page_endHead(page);
@@ -213,11 +213,11 @@ void rainback_generateLoginSucceededPage(rainback_Page* page, mod_rainback* rb, 
         "Location: /\r\n"
         "\r\n",
         bodylen,
-        parsegraph_constructSessionString(rb->pool,
+        parsegraph_constructSessionString(rb->session,
             login->session_selector,
             login->session_token
         ),
-        rb->server->using_ssl ? "Secure;" : ""
+        rb->session->server->using_ssl ? "Secure;" : ""
     );
     rainback_Page_write(page, buf, len);
     rainback_Page_endHead(page);
@@ -425,7 +425,7 @@ static marla_WriteResult readLoginForm(mod_rainback* rb, marla_Request* req, cha
 
     rainback_Page* page = rainback_Page_new("");
 
-    switch(parsegraph_beginUserLogin(rb->pool, rb->dbd,
+    switch(parsegraph_beginUserLogin(rb->session,
         username, password,
         &login
     )) {
@@ -515,7 +515,7 @@ void rainback_loginHandler(struct marla_Request* req, enum marla_ClientEvent ev,
         if(strcmp("Cookie", data)) {
             break;
         }
-        rainback_authenticateByCookie(req, resp->pool, resp->rb->dbd, &resp->login, data + dataLen);
+        rainback_authenticateByCookie(req, resp->rb, &resp->login, data + dataLen);
         break;
     case marla_EVENT_ACCEPTING_REQUEST:
         *((int*)data) = acceptRequest(req);

@@ -64,6 +64,9 @@ void mod_rainback_route(struct marla_Request* req, void* hookData)
         req->handlerData = rainback_ProfileResponse_new(rb);
         return;
     }
+    if(!strcmp(req->uri, "/environment/live")) {
+        rainback_live_environment_install(rb, req);
+    }
     /*if(!strncmp(req->uri, "/user", 5)) {
         // Check for suitable termination
         if(req->uri[5] != 0 && req->uri[5] != '/' && req->uri[5] != '?') {
