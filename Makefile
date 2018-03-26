@@ -16,7 +16,7 @@ CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -l
 all: mod_rainback.so
 .PHONY: all
 
-SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/live_environment.c
+SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/account.c src/live_environment.c
 #SOURCES=src/module.c src/route.c src/auth.c src/contact.c src/homepage.c src/user.c src/user_json.c src/import.c src/search.c src/environment.c src/payment.c src/profile.c src/subscribe.c
 HEADERS=src/mod_rainback.h
 

@@ -60,6 +60,14 @@ void rainback_generateLoginSucceededPage(rainback_Page* page, mod_rainback* rb, 
 void rainback_generateLoginFailedPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login, char* username);
 void rainback_generateBadUserOrPasswordPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login, char* username);
 
+// Account
+struct rainback_AccountResponse;
+typedef struct rainback_AccountResponse rainback_AccountResponse;
+void rainback_accountHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+void rainback_AccountResponse_destroy(rainback_AccountResponse* resp);
+rainback_AccountResponse* rainback_AccountResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_generateAccountPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login);
+
 // Logout
 struct rainback_LogoutResponse;
 typedef struct rainback_LogoutResponse rainback_LogoutResponse;

@@ -19,6 +19,9 @@ void rainback_generatePage(rainback_Page* page, mod_rainback* rb, const char* pa
     if(!strcmp(url, "/profile") || !strcmp(url, "/profile/")) {
         rainback_generateProfilePage(page, rb, pageState, login);
     }
+    if(!strcmp(url, "/account") || !strcmp(url, "/account/")) {
+        rainback_generateAccountPage(page, rb, login);
+    }
     /*else if(!strcmp(url, "/contact") || !strcmp(url, "/contact/")) {
         rainback_generateContactPage(page, rb, pageState, login);
     }
