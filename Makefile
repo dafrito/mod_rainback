@@ -6,8 +6,8 @@ USER=$(shell whoami)
 UID=$(shell id -u `whoami`)
 GID=$(shell id -g `whoami`)
 PACKAGE_NAME=mod_rainback
-PACKAGE_VERSION=1.0
-PACKAGE_RELEASE=31
+PACKAGE_VERSION=1.3
+PACKAGE_RELEASE=4
 PACKAGE_URL=rainback.com
 build_cpu=x86_64
 
