@@ -7,8 +7,8 @@ rainback_Page* rainback_Page_new(const char* cacheKey)
 {
     rainback_Page* page = malloc(sizeof(*page));
     page->data = malloc(BUFSIZE);
-    page->contentLength = 0;
-    page->headLength = 0;
+    page->length = 0;
+    page->headBoundary = 0;
     page->capacity = BUFSIZE;
     page->refs = 1;
     page->writeStage = 0;
@@ -27,25 +27,40 @@ rainback_Page* rainback_Page_new(const char* cacheKey)
 
 void rainback_Page_endHead(rainback_Page* page)
 {
-    page->writeStage = 1;
+    page->headBoundary = page->length;
 }
 
-int rainback_Page_write(rainback_Page* page, void* buf, size_t len)
+int rainback_Page_prepend(rainback_Page* page, void* buf, size_t len)
 {
-    while(page->capacity < page->headLength + page->contentLength + len) {
+    while(page->capacity < page->length + len) {
         page->data = realloc(page->data, page->capacity * 2);
         page->capacity *= 2;
         if(!page->data) {
             return -1;
         }
     }
-    memcpy(page->data + page->headLength + page->contentLength, buf, len);
-    if(page->writeStage == 0) {
-        page->headLength += len;
+    memmove(page->data + len, page->data, page->length);
+    memcpy(page->data, buf, len);
+    page->length += len;
+    return len;
+}
+
+int rainback_Page_write(rainback_Page* page, void* buf, size_t len)
+{
+    return rainback_Page_append(page, buf, len);
+}
+
+int rainback_Page_append(rainback_Page* page, void* buf, size_t len)
+{
+    while(page->capacity < page->length + len) {
+        page->data = realloc(page->data, page->capacity * 2);
+        page->capacity *= 2;
+        if(!page->data) {
+            return -1;
+        }
     }
-    else if(page->writeStage == 1) {
-        page->contentLength += len;
-    }
+    memcpy(page->data + page->length, buf, len);
+    page->length += len;
     return len;
 }
 
@@ -73,8 +88,8 @@ static marla_WriteResult writeResponse(marla_Request* req, marla_WriteEvent* we)
     rainback_Page* page = req->handlerData;
 
     const char* header = page->data;
-    int needed = page->headLength + (!strcmp(req->method, "HEAD") ? 0 : page->contentLength) - we->index;
-    //fprintf(stderr, "Head=%d, Content=%d, index=%d, needed is %d\n", page->headLength, page->contentLength, we->index, needed);
+    int needed = (!strcmp(req->method, "HEAD") ? page->headBoundary : page->length) - we->index;
+    //fprintf(stderr, "Head=%d, Content=%d, index=%d, needed is %d\n", page->headBoundary, page->length, we->index, needed);
     int nwritten = marla_Connection_write(req->cxn, page->data + we->index, needed);
     if(nwritten > 0) {
         we->index += nwritten;
@@ -83,10 +98,10 @@ static marla_WriteResult writeResponse(marla_Request* req, marla_WriteEvent* we)
         //fprintf(stderr, "DOWNSTREAM CHOKED after %d\n", nwritten);
         return marla_WriteResult_DOWNSTREAM_CHOKED;
     }
-    if(!strcmp(req->method, "HEAD") && we->index >= page->headLength) {
+    if(!strcmp(req->method, "HEAD") && we->index >= page->headBoundary) {
         req->writeStage = marla_CLIENT_REQUEST_AFTER_RESPONSE;
     }
-    else if(we->index >= page->headLength + page->contentLength) {
+    else if(we->index >= page->length) {
         req->writeStage = marla_CLIENT_REQUEST_AFTER_RESPONSE;
     }
     return marla_WriteResult_CONTINUE;

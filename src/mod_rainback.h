@@ -24,8 +24,8 @@ void mod_rainback_destroy(mod_rainback* rb);
 struct rainback_Page {
 char* cacheKey;
 unsigned char* data;
-size_t contentLength;
-size_t headLength;
+size_t length;
+size_t headBoundary;
 size_t capacity;
 int refs;
 int writeStage;
@@ -35,6 +35,8 @@ typedef struct rainback_Page rainback_Page;
 
 rainback_Page* rainback_Page_new(const char* cacheKey);
 int rainback_Page_write(rainback_Page* page, void* buf, size_t len);
+int rainback_Page_append(rainback_Page* page, void* buf, size_t len);
+int rainback_Page_prepend(rainback_Page* page, void* buf, size_t len);
 void rainback_Page_ref(rainback_Page* page);
 void rainback_Page_unref(rainback_Page* page);
 void rainback_Page_endHead(rainback_Page* page);
