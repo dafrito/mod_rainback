@@ -18,7 +18,7 @@ rainback_SignupResponse* rainback_SignupResponse_new(marla_Request* req, mod_rai
     memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
     if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
-        marla_killRequest(req, "Failed to create request handler memory pool.");
+        marla_killRequest(req, 500, "Failed to create request handler memory pool.");
     }
     resp->input = marla_Ring_new(BUFSIZE);
     return resp;
@@ -254,7 +254,7 @@ static marla_WriteResult readSignupForm(mod_rainback* rb, marla_Request* req, ch
         for(str2 = token; ;) {
             subtoken = strtok_r(str2, "=", &sepPtr);
             if(subtoken == 0) {
-                marla_killRequest(req, "Login pair must have at least one =.");
+                marla_killRequest(req, 400, "Login pair must have at least one =.");
                 return marla_WriteResult_KILLED;
             }
             if(!strcmp(subtoken, "username")) {
@@ -265,7 +265,7 @@ static marla_WriteResult readSignupForm(mod_rainback* rb, marla_Request* req, ch
                     case APR_NOTFOUND:
                         break;
                     default:
-                        marla_killRequest(req, "Failed to unescape username.");
+                        marla_killRequest(req, 400, "Failed to unescape username.");
                         return marla_WriteResult_KILLED;
                     }
                 }
@@ -278,7 +278,7 @@ static marla_WriteResult readSignupForm(mod_rainback* rb, marla_Request* req, ch
                     case APR_NOTFOUND:
                         break;
                     default:
-                        marla_killRequest(req, "Failed to unescape password.");
+                        marla_killRequest(req, 400, "Failed to unescape password.");
                         return marla_WriteResult_KILLED;
                     }
                 }
@@ -291,7 +291,7 @@ static marla_WriteResult readSignupForm(mod_rainback* rb, marla_Request* req, ch
                     case APR_NOTFOUND:
                         break;
                     default:
-                        marla_killRequest(req, "Failed to unescape repeated password.");
+                        marla_killRequest(req, 400, "Failed to unescape repeated password.");
                         return marla_WriteResult_KILLED;
                     }
                 }
@@ -351,7 +351,7 @@ static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* w
             for(int i = 0; i < len; ++i) {
                 char c = buf[i];
                 if(c == 0) {
-                    marla_killRequest(req, "Unexpected null given in %s request.", req->method);
+                    marla_killRequest(req, 400, "Unexpected null given in %s request.", req->method);
                     return marla_WriteResult_KILLED;
                 }
             }
@@ -364,14 +364,14 @@ static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* w
         return marla_WriteResult_CONTINUE;
     }
     if(strcmp(req->method, "POST")) {
-        marla_killRequest(req, "Unexpected input given in %s request.", req->method);
+        marla_killRequest(req, 400, "Unexpected input given in %s request.", req->method);
         return marla_WriteResult_KILLED;
     }
 
     int nwrit = marla_Ring_write(resp->input, we->buf + we->index, we->length - we->index);
     we->index += nwrit;
     if(nwrit < we->length - we->index) {
-        marla_killRequest(req, "Too much input given to login request.\n");
+        marla_killRequest(req, 400, "Too much input given to login request.\n");
         return marla_WriteResult_KILLED;
     }
 
@@ -423,7 +423,7 @@ void rainback_signupHandler(struct marla_Request* req, enum marla_ClientEvent ev
         we->status = readRequestBody(req, we);
         break;
     case marla_EVENT_MUST_WRITE:
-        marla_killRequest(req, "SignupHandler must not process write events.");
+        marla_killRequest(req, 500, "SignupHandler must not process write events.");
         break;
     case marla_EVENT_DESTROYING:
         req->handlerData = 0;

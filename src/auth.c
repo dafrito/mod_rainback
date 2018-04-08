@@ -38,14 +38,14 @@ int rainback_authenticateByCookie(marla_Request* req, mod_rainback* rb, parsegra
                 parsegraph_UserStatus rv = parsegraph_refreshUserLogin(rb->session, login);
                 if(rv != parsegraph_OK) {
                     if(parsegraph_isSeriousUserError(rv)) {
-                        marla_killRequest(req, "Failed to refresh session's login: %s", parsegraph_nameUserStatus(rv));
+                        marla_killRequest(req, 500, "Failed to refresh session's login: %s", parsegraph_nameUserStatus(rv));
                     }
                     return 2;
                 }
 
                 parsegraph_UserStatus idRV = parsegraph_getIdForUsername(rb->session, login->username, &(login->userId));
                 if(parsegraph_isSeriousUserError(idRV)) {
-                    marla_killRequest(req, "Failed to retrieve ID for authenticated login.");
+                    marla_killRequest(req, 500, "Failed to retrieve ID for authenticated login.");
                     return 2;
                 }
             }

@@ -100,18 +100,18 @@ void rainback_pageHandler(struct marla_Request* req, enum marla_ClientEvent ev, 
     case marla_EVENT_REQUEST_BODY:
         we = data;
         if(we->length != 0) {
-            marla_killRequest(req, "rainback_pageHandler must not process any request body.");
+            marla_killRequest(req, 500, "rainback_pageHandler must not process any request body.");
         }
         else {
             req->readStage = marla_CLIENT_REQUEST_DONE_READING;
         }
         break;
     case marla_EVENT_HEADER:
-        marla_killRequest(req, "rainback_pageHandler must not process headers.");
+        marla_killRequest(req, 500, "rainback_pageHandler must not process headers.");
         break;
     case marla_EVENT_ACCEPTING_REQUEST:
         (*(int*)data) = 1;
-        //marla_killRequest(req, "rainback_pageHandler must not accept requests.");
+        //marla_killRequest(req, 500, "rainback_pageHandler must not accept requests.");
         break;
     case marla_EVENT_MUST_WRITE:
         we = data;

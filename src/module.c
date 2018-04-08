@@ -103,7 +103,7 @@ void mod_rainback_destroy(mod_rainback* rb)
     free(rb);
 }
 
-static void undertake(marla_Request* req)
+static void undertake(marla_Request* req, int statusCode)
 {
     if(req->handler) {
         // Destroy any existing handler data.
@@ -112,7 +112,7 @@ static void undertake(marla_Request* req)
 
     mod_rainback* rb = req->cxn->server->undertakerData;
     req->handler = rainback_pageHandler;
-    req->handlerData = rainback_getKilledPage(rb, req->error, req->uri);
+    req->handlerData = rainback_getKilledPage(rb, statusCode, req->error);
 }
 
 mod_rainback* mod_rainback_new(marla_Server* server)

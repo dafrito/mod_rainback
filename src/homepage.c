@@ -1,5 +1,6 @@
 #include "mod_rainback.h"
 #include <string.h>
+#include <apr_strings.h>
 
 #define BUFSIZE 4096
 
@@ -16,7 +17,7 @@ rainback_HomepageResponse* rainback_HomepageResponse_new(marla_Request* req, mod
     memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
     if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
-        marla_killRequest(req, "Failed to create request handler memory pool.");
+        marla_killRequest(req, 500, "Failed to create request handler memory pool.");
     }
     resp->input = marla_Ring_new(BUFSIZE);
     return resp;
@@ -48,7 +49,7 @@ static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* w
         req->writeStage = marla_CLIENT_REQUEST_DONE_READING;
         return marla_WriteResult_CONTINUE;
     }
-    marla_killRequest(req, "Unexpected input given in %s request.", req->method);
+    marla_killRequest(req, 400, "Unexpected input given in %s request.", req->method);
     return marla_WriteResult_KILLED;
 }
 
@@ -72,7 +73,7 @@ void rainback_homepageHandler(struct marla_Request* req, enum marla_ClientEvent 
         we->status = readRequestBody(req, we);
         break;
     case marla_EVENT_MUST_WRITE:
-        marla_killRequest(req, "HomepageHandler must not process write events.");
+        marla_killRequest(req, 500, "HomepageHandler must not process write events.");
         break;
     case marla_EVENT_DESTROYING:
         req->handlerData = 0;

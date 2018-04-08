@@ -155,7 +155,7 @@ mod_rainback* rb;
 };
 typedef struct rainback_SubscribeHandlerData rainback_SubscribeHandlerData;
 rainback_SubscribeHandlerData* rainback_SubscribeHandlerData_new(marla_Request* req, mod_rainback* rb);
-rainback_Page* rainback_getKilledPage(mod_rainback* rb, const char* reason, const char* url);
+rainback_Page* rainback_getKilledPage(mod_rainback* rb, int statusCode, const char* reason);
 
 #include "marla.h"
 

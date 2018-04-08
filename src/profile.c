@@ -116,7 +116,7 @@ static marla_WriteResult readProfileForm(mod_rainback* rb, marla_Request* req, c
         for(str2 = token; ;) {
             subtoken = strtok_r(str2, "=", &sepPtr);
             if(subtoken == 0) {
-                marla_killRequest(req, "Pair must have at least one =.");
+                marla_killRequest(req, 400, "Pair must have at least one =.");
                 return marla_WriteResult_KILLED;
             }
             if(!strcmp(subtoken, "username")) {
@@ -127,7 +127,7 @@ static marla_WriteResult readProfileForm(mod_rainback* rb, marla_Request* req, c
                     case APR_NOTFOUND:
                         break;
                     default:
-                        marla_killRequest(req, "Failed to unescape username.");
+                        marla_killRequest(req, 400, "Failed to unescape username.");
                         return marla_WriteResult_KILLED;
                     }
                 }
@@ -140,14 +140,14 @@ static marla_WriteResult readProfileForm(mod_rainback* rb, marla_Request* req, c
                     case APR_NOTFOUND:
                         break;
                     default:
-                        marla_killRequest(req, "Failed to unescape password.");
+                        marla_killRequest(req, 400, "Failed to unescape password.");
                         return marla_WriteResult_KILLED;
                     }
                 }
             }
             subtoken = strtok_r(0, "=", &sepPtr);
             if(subtoken != NULL) {
-                marla_killRequest(req, "Pair is malformed.");
+                marla_killRequest(req, 400, "Pair is malformed.");
                 return marla_WriteResult_KILLED;
             }
             break;
@@ -197,14 +197,14 @@ static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* w
         return marla_WriteResult_CONTINUE;
     }
     if(strcmp(req->method, "POST")) {
-        marla_killRequest(req, "Unexpected input given in %s request.", req->method);
+        marla_killRequest(req, 400, "Unexpected input given in %s request.", req->method);
         return marla_WriteResult_KILLED;
     }
 
     int nwrit = marla_Ring_write(resp->input, we->buf + we->index, we->length - we->index);
     we->index += nwrit;
     if(nwrit < we->length - we->index) {
-        marla_killRequest(req, "Too much input given to login request.\n");
+        marla_killRequest(req, 400, "Too much input given to login request.\n");
         return marla_WriteResult_KILLED;
     }
 
@@ -256,7 +256,7 @@ void rainback_profileHandler(struct marla_Request* req, enum marla_ClientEvent e
         we->status = readRequestBody(req, we);
         break;
     case marla_EVENT_MUST_WRITE:
-        marla_killRequest(req, "ProfileHandler must not process write events.");
+        marla_killRequest(req, 500, "ProfileHandler must not process write events.");
         break;
     case marla_EVENT_DESTROYING:
         req->handlerData = 0;

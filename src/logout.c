@@ -18,7 +18,7 @@ rainback_LogoutResponse* rainback_LogoutResponse_new(marla_Request* req, mod_rai
     memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
     if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
-        marla_killRequest(req, "Failed to create request handler memory pool.");
+        marla_killRequest(req, 500, "Failed to create request handler memory pool.");
     }
     resp->input = marla_Ring_new(BUFSIZE);
     return resp;
@@ -292,7 +292,7 @@ static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* w
         req->readStage = marla_CLIENT_REQUEST_DONE_READING;
         return marla_WriteResult_CONTINUE;
     }
-    marla_killRequest(req, "Unexpected input given in %s request.", req->method);
+    marla_killRequest(req, 400, "Unexpected input given in %s request.", req->method);
     return marla_WriteResult_KILLED;
 }
 
@@ -341,7 +341,7 @@ void rainback_logoutHandler(struct marla_Request* req, enum marla_ClientEvent ev
         we->status = readRequestBody(req, we);
         break;
     case marla_EVENT_MUST_WRITE:
-        marla_killRequest(req, "LogoutHandler must not process write events.");
+        marla_killRequest(req, 500, "LogoutHandler must not process write events.");
         break;
     case marla_EVENT_DESTROYING:
         req->handlerData = 0;
