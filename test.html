@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title><%=title%></title>
+</head>
+<body>
+<p><%=content%></p>
+<ul><% foreach v in list %>
+<li>
+    <ul><% foreach p in list %>
+    <li>(<%=v%>, <%=p%>) <%=content%></li><% endfor %>
+    </ul>
+</li><% endfor %>
+</ul>
+</body>
+</html>

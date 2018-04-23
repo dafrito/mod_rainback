@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title><%=title%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="rainback.css">
+    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+</head>
+<body>
+<nav>
+    <p style="text-align: center">
+    <a href=/><img id=logo src="nav-side-logo.png"></img></a>
+    </p>
+</nav>
+    <div class=links>
+        <form id=search action="/search">
+        <input name=q></input> <input type=submit value=Search></input>
+        </form>
+        <form id=logout method=post action="/logout" style="display: inline-block"><input type=submit value="Log out"></form>
+        <a href="/profile"><span class="bud">Profile</span></a>
+        <a href="/import"><span class="bud import-button">Import</span></a>
+    </div>
+    <div class=block style="clear:both; overflow: hidden">
+        <h1><%=username%></h1>
+<div class=slot style="float: right; padding-left: 1em; padding-bottom: 1em">
+<b>User Management</b><br/>
+<ul style="margin: 0; margin-top: 1em;">
+<li><a href="/account">User Account</a></li>
+<li><a href="/subscribe">Subscription</a></li>
+</ul>
+</div>
+</div>
+<div style="display: block; text-align: center; margin: 1em 0">
+    <div class=slot style="display: inline-block;">
+        &copy; 2018 <a href="https://rainback.com">Rainback, Inc.</a> All rights reserved. <a href=/contact><span class="bud">Contact Us</span></a>
+    </div>
+</div>
+</body>
+</html>

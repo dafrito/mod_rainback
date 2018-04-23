@@ -1,69 +1,217 @@
 #include "mod_rainback.h"
 #include <string.h>
+#include <apr_strings.h>
+#include <apr_escape.h>
 
-struct rainback_ProfileResponse {
+#define BUFSIZE 4096
+
+struct rainback_SubscribeResponse {
 apr_pool_t* pool;
 ap_dbd_t* dbd;
-parsegraph_user_login* login;
+parsegraph_user_login login;
 marla_Ring* input;
+mod_rainback* rb;
 };
-typedef struct rainback_ProfileResponse rainback_ProfileResponse;
+typedef struct rainback_SubscribeResponse rainback_SubscribeResponse;
 
-rainback_ProfileResponse* rainback_ProfileResponse_new(apr_pool_t* pool)
+rainback_SubscribeResponse* rainback_SubscribeResponse_new(marla_Request* req, mod_rainback* rb)
 {
-    rainback_ProfileResponse* resp = malloc(sizeof(*resp));
-    if(APR_SUCCESS != apr_pool_create(&resp->pool, pool)) {
-        fprintf(stderr, "Failed to create APR pool for profile response.\n");
-        abort();
+    rainback_SubscribeResponse* resp = malloc(sizeof(*resp));
+    memset(&resp->login, 0, sizeof(resp->login));
+    resp->rb = rb;
+    if(apr_pool_create(&resp->pool, resp->rb->session->pool) != APR_SUCCESS) {
+        marla_killRequest(req, 500, "Failed to create request handler memory pool.");
     }
-    resp->login = calloc(1, sizeof(parsegraph_user_login));
-    resp->input = marla_Ring_new(4096);
+    resp->input = marla_Ring_new(BUFSIZE);
     return resp;
 }
 
-void rainback_ProfileResponse_destroy(rainback_ProfileResponse* resp)
+void rainback_SubscribeResponse_destroy(rainback_SubscribeResponse* resp)
 {
-    marla_Ring_free(resp->input);
-    free(resp->login);
     apr_pool_destroy(resp->pool);
+    marla_Ring_free(resp->input);
     free(resp);
+}
+
+void rainback_generateSubscribePage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login)
+{
+    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
+    memset(encodedUsername, 0, sizeof(encodedUsername));
+    apr_escape_entity(encodedUsername, login->username, APR_ESCAPE_STRING, 1, 0);
+
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    // Render the response body from the template.
+    apr_hash_t* context = apr_hash_make(pool);
+    apr_hash_set(context, "title", APR_HASH_KEY_STRING,
+        (login && login->username) ? login->username : "Rainback");
+    apr_hash_set(context, "username", APR_HASH_KEY_STRING,
+        (login && login->username) ? login->username : "Anonymous");
+    rainback_renderTemplate(rb, "subscribe.html", context, page);
+
+    char buf[8192];
+    int len = snprintf(buf, sizeof buf,
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %d\r\n"
+        "\r\n",
+        page->length
+    );
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
+}
+
+static marla_WriteResult readSubscribeForm(mod_rainback* rb, marla_Request* req, char* buf, size_t buflen, parsegraph_user_login* login)
+{
+    if(!login) {
+        fprintf(stderr, "A non-null login struct must be given.\n");
+        abort();
+    }
+    char* pairPtr;
+    char* sepPtr;
+    char username[parsegraph_USERNAME_MAX_LENGTH + 1];
+    int usernameIndex = 0;
+    memset(username, 0, sizeof username);
+    char password[parsegraph_PASSWORD_MAX_LENGTH + 1];
+    int passwordIndex = 0;
+    memset(password, 0, sizeof password);
+
+    char* str1 = buf;
+    char* str2;
+    char* token, *subtoken;
+    int j;
+    token = strtok_r(buf, "&", &pairPtr);
+    for(j = 1, str1 = buf; token; j++, str1 = NULL, token = strtok_r(0, "&", &pairPtr)) {
+        for(str2 = token; ;) {
+            subtoken = strtok_r(str2, "=", &sepPtr);
+            if(subtoken == 0) {
+                marla_killRequest(req, 400, "Login pair must have at least one =.");
+                return marla_WriteResult_KILLED;
+            }
+            if(!strcmp(subtoken, "username")) {
+                subtoken = strtok_r(0, "=", &sepPtr);
+                if(subtoken != 0) {
+                    switch(apr_unescape_url(username, subtoken, APR_ESCAPE_STRING, 0, 0, 1, 0)) {
+                    case APR_SUCCESS:
+                    case APR_NOTFOUND:
+                        break;
+                    default:
+                        marla_killRequest(req, 400, "Failed to unescape username.");
+                        return marla_WriteResult_KILLED;
+                    }
+                }
+            }
+            else if(!strcmp(subtoken, "password")) {
+                subtoken = strtok_r(0, "=", &sepPtr);
+                if(subtoken != 0) {
+                    switch(apr_unescape_url(password, subtoken, APR_ESCAPE_STRING, 0, 0, 1, 0)) {
+                    case APR_SUCCESS:
+                    case APR_NOTFOUND:
+                        break;
+                    default:
+                        marla_killRequest(req, 400, "Failed to unescape password.");
+                        return marla_WriteResult_KILLED;
+                    }
+                }
+            }
+            subtoken = strtok_r(0, "=", &sepPtr);
+            if(subtoken != NULL) {
+                marla_killRequest(req, 400, "Login pair is malformed.");
+                return marla_WriteResult_KILLED;
+            }
+            break;
+        }
+    }
+
+    rainback_Page* page = rainback_Page_new("");
+
+    switch(parsegraph_beginUserLogin(rb->session,
+        username, password,
+        &login
+    )) {
+    case parsegraph_OK:
+        rainback_generateLoginSucceededPage(page, rb, login);
+        break;
+    case parsegraph_UNDEFINED_PREPARED_STATEMENT:
+    case parsegraph_ERROR:
+        rainback_generateLoginFailedPage(page, rb, login, username);
+        break;
+    default:
+    case parsegraph_INVALID_PASSWORD:
+    case parsegraph_USER_DOES_NOT_EXIST:
+        rainback_generateBadUserOrPasswordPage(page, rb, login, username);
+        break;
+    }
+    rainback_LoginResponse* resp = req->handlerData;
+    rainback_LoginResponse_destroy(resp);
+    req->handler = rainback_pageHandler;
+    req->handlerData = page;
+    return marla_WriteResult_CONTINUE;
 }
 
 static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* we)
 {
+    rainback_SubscribeResponse* resp = req->handlerData;
     if(we->length == 0) {
-        req->writeStage = marla_CLIENT_REQUEST_DONE_READING;
+        if(!strcmp(req->method, "POST")) {
+            unsigned char buf[4096];
+            int len = marla_Ring_read(resp->input, buf, sizeof buf);
+            buf[len] = 0;
+            marla_WriteResult wr = readSubscribeForm(resp->rb, req, buf, len, &resp->login);
+            if(wr != marla_WriteResult_CONTINUE) {
+                return wr;
+            }
+        }
+        req->readStage = marla_CLIENT_REQUEST_DONE_READING;
         return marla_WriteResult_CONTINUE;
     }
-    rainback_ProfileResponse* resp = req->handlerData;
-
-    int true_read = marla_Ring_write(resp->input, we->buf + we->index, we->length - we->index);
-    if(true_read < 0) {
-        return marla_WriteResult_DOWNSTREAM_CHOKED;
+    if(strcmp(req->method, "POST")) {
+        marla_killRequest(req, 400, "Unexpected input given in %s request.", req->method);
+        return marla_WriteResult_KILLED;
     }
-    we->index += true_read;
-    return marla_WriteResult_CONTINUE;
-}
 
-static marla_WriteResult writeResponse(marla_Request* req)
-{
-    req->writeStage = marla_CLIENT_REQUEST_AFTER_RESPONSE;
+    int nwrit = marla_Ring_write(resp->input, we->buf + we->index, we->length - we->index);
+    we->index += nwrit;
+    if(nwrit < we->length - we->index) {
+        marla_killRequest(req, 400, "Too much input given to login request.\n");
+        return marla_WriteResult_KILLED;
+    }
+
     return marla_WriteResult_CONTINUE;
 }
 
 static int acceptRequest(marla_Request* req)
 {
-    return 1;
+    rainback_SubscribeResponse* resp = req->handlerData;
+    if(!strcmp(req->method, "GET") || !strcmp(req->method, "HEAD")) {
+        if(!resp->login.username) {
+            rainback_Page* page = rainback_Page_new(0);
+            rainback_generateNotLoggedInPage(page, resp->rb);
+            req->handler = rainback_pageHandler;
+            req->handlerData = page;
+            rainback_SubscribeResponse_destroy(resp);
+            return 1;
+        }
+
+        req->handler = rainback_pageHandler;
+        req->handlerData = rainback_getPage(resp->rb, "", req->uri, &resp->login);
+        rainback_SubscribeResponse_destroy(resp);
+        return 1;
+    }
+    if(!strcmp(req->method, "POST")) {
+        return 1;
+    }
+
+    return 0;
 }
 
-
-void rainback_profileHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen)
+void rainback_subscribeHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen)
 {
-    rainback_ProfileResponse* resp = req->handlerData;
-    if(!resp) {
-        resp = rainback_ProfileResponse_new(0);
-        req->handlerData = resp;
-    }
+    rainback_SubscribeResponse* resp = req->handlerData;
 
     marla_WriteEvent* we;
     switch(ev) {
@@ -71,7 +219,7 @@ void rainback_profileHandler(struct marla_Request* req, enum marla_ClientEvent e
         if(strcmp("Cookie", data)) {
             break;
         }
-        rainback_processCookie(req, resp->pool, resp->dbd, resp->login, data + dataLen);
+        rainback_authenticateByCookie(req, resp->rb, &resp->login, data + dataLen);
         break;
     case marla_EVENT_ACCEPTING_REQUEST:
         *((int*)data) = acceptRequest(req);
@@ -81,13 +229,11 @@ void rainback_profileHandler(struct marla_Request* req, enum marla_ClientEvent e
         we->status = readRequestBody(req, we);
         break;
     case marla_EVENT_MUST_WRITE:
-        we = data;
-        we->status = writeResponse(req);
+        marla_killRequest(req, 500, "SubscribeHandler must not process write events.");
         break;
     case marla_EVENT_DESTROYING:
         req->handlerData = 0;
-        rainback_ProfileResponse_destroy(resp);
+        rainback_SubscribeResponse_destroy(resp);
         break;
     }
 }
-

@@ -94,13 +94,20 @@ void mod_rainback_destroy(mod_rainback* rb)
 {
     mod_rainback_eachPage(rb, destroyPage, 0);
     apr_hash_clear(rb->cache);
+    apr_hash_clear(rb->templates);
 
     // Disconnect database.
     apr_dbd_close(rb->session->dbd->driver, rb->session->dbd->handle);
-    free(rb->session->dbd);
+    apr_dbd_close(rb->worldSession->dbd->driver, rb->worldSession->dbd->handle);
 
-    apr_pool_destroy(rb->session->pool);
+    parsegraph_Session_destroy(rb->session);
+    parsegraph_Session_destroy(rb->worldSession);
+
     free(rb);
+}
+
+static void fileUpdated(marla_FileEntry* fe)
+{
 }
 
 static void undertake(marla_Request* req, int statusCode)
@@ -151,6 +158,7 @@ mod_rainback* mod_rainback_new(marla_Server* server)
     rb->worldSession->server = server;
     mod_rainback_prepareDBD(rb->worldSession);
     rb->cache = apr_hash_make(rb->session->pool);
+    rb->templates = apr_hash_make(rb->session->pool);
 
     return rb;
 }
@@ -163,6 +171,9 @@ void mod_rainback_init(struct marla_Server* server, enum marla_ServerModuleEvent
         rb = mod_rainback_new(server);
         server->undertaker = undertake;
         server->undertakerData = rb;
+
+        server->fileUpdated = fileUpdated;
+        server->fileUpdatedData = rb;
         marla_Server_addHook(server, marla_ServerHook_ROUTE, mod_rainback_route, rb);
         //printf("mod_rainback loaded.\n");
         break;

@@ -1,6 +1,6 @@
 #include "mod_rainback.h"
 
-/*static int handleSearch(marla_Request* req, mod_rainback* rb)
+static int handleSearch(marla_Request* req, mod_rainback* rb)
 {
     if(strncmp(req->uri, "/search", strlen("/search"))) {
         return 1;
@@ -13,7 +13,6 @@
             return 1;
         }
         // Accessing the search page directly.
-        strcpy(req->uri, "/search?q=");
     }
     else {
         if(req->uri[strlen("/search") + 1] != 'q') {
@@ -31,14 +30,17 @@
     }
 
     req->handler = rainback_searchHandler;
+    req->handlerData = rainback_SearchResponse_new(req, rb);
     return 0;
 }
-*/
 
 void mod_rainback_route(struct marla_Request* req, void* hookData)
 {
     mod_rainback* rb = hookData;
     struct marla_ChunkedPageRequest* cpr;
+    if(handleSearch(req, rb) == 0) {
+        return;
+    }
     if(!strcmp(req->uri, "/")) {
         req->handler = rainback_homepageHandler;
         req->handlerData = rainback_HomepageResponse_new(req, rb);
@@ -64,32 +66,33 @@ void mod_rainback_route(struct marla_Request* req, void* hookData)
         req->handlerData = rainback_ProfileResponse_new(rb);
         return;
     }
+    if(!strcmp(req->uri, "/authenticate") || !strcmp(req->uri, "/authenticate/")) {
+        req->handler = rainback_authenticateHandler;
+        req->handlerData = rainback_AuthenticateResponse_new(req, rb);
+        return;
+    }
     if(!strcmp(req->uri, "/account") || !strcmp(req->uri, "/account/")) {
         req->handler = rainback_accountHandler;
         req->handlerData = rainback_AccountResponse_new(req, rb);
         return;
     }
-    if(!strcmp(req->uri, "/environment/live")) {
-        rainback_live_environment_install(rb, req);
-    }
-    /*if(!strncmp(req->uri, "/user", 5)) {
-        // Check for suitable termination
-        if(req->uri[5] != 0 && req->uri[5] != '/' && req->uri[5] != '?') {
-            // Not really handled.
-            return;
-        }
-        req->handler = rainback_userHandler;
-        req->handlerData = rainback_UserHandlerData_new(req, rb);
+    if(!strcmp(req->uri, "/subscribe") || !strcmp(req->uri, "/subscribe/")) {
+        req->handler = rainback_subscribeHandler;
+        req->handlerData = rainback_SubscribeResponse_new(req, rb);
         return;
     }
-    if(!strcmp(req->uri, "/contact")) {
+    if(!strcmp(req->uri, "/contact") || !strcmp(req->uri, "/contact/")) {
         req->handler = rainback_contactHandler;
-        req->handlerData = rainback_ContactHandlerData_new(req, rb);
+        req->handlerData = rainback_ContactResponse_new(req, rb);
         return;
     }
-    if(!strcmp(req->uri, "/import")) {
+    if(!strcmp(req->uri, "/import") || !strcmp(req->uri, "/import/")) {
         req->handler = rainback_importHandler;
-        req->handlerData = rainback_ImportHandlerData_new(req, rb);
+        req->handlerData = rainback_ImportResponse_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/environment/live") || !strcmp(req->uri, "/environment/live")) {
+        rainback_live_environment_install(rb, req);
         return;
     }
     int len = strlen("/environment");
@@ -99,14 +102,20 @@ void mod_rainback_route(struct marla_Request* req, void* hookData)
             // Not really handled.
             return;
         }
-        if(req->uri[len] == '/' && req->uri[len + 1] == 0) {
+        if(strlen(req->uri) - len > 2) {
             req->handler = rainback_environmentHandler;
-            req->handlerData = rainback_EnvironmentHandlerData_new(req, rb);
+            req->handlerData = rainback_EnvironmentResponse_new(req, rb);
+            return;
         }
-        // Not really handled.
-        return;
     }
-    if(handleSearch(req, rb) == 0) {
+    /*if(!strncmp(req->uri, "/user", 5)) {
+        // Check for suitable termination
+        if(req->uri[5] != 0 && req->uri[5] != '/' && req->uri[5] != '?') {
+            // Not really handled.
+            return;
+        }
+        req->handler = rainback_userHandler;
+        req->handlerData = rainback_UserHandlerData_new(req, rb);
         return;
     }
     if(!strcmp(req->uri, "/payment")) {
@@ -119,11 +128,7 @@ void mod_rainback_route(struct marla_Request* req, void* hookData)
         req->handlerData = rainback_ProfileResponse_new(req, rb);
         return;
     }
-    if(!strcmp(req->uri, "/subscribe")) {
-        req->handler = rainback_subscribeHandler;
-        req->handlerData = rainback_SubscribeHandlerData_new(req, rb);
-        return;
-    }*/
+*/
 
-    req->handler = marla_backendClientHandler;
+    req->handler = marla_fileHandler;
 }

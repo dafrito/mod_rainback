@@ -39,13 +39,56 @@ static int acceptRequest(marla_Request* req)
         rainback_HomepageResponse_destroy(resp);
         return 1;
     }
+    else if(!strcmp(req->method, "POST")) {
+        return 1;
+    }
 
     return 0;
 }
 
 static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* we)
 {
-    if(we->length == 0) {
+    rainback_HomepageResponse* resp = req->handlerData;
+
+    if(!strcmp(req->method, "POST")) {
+        char* buf = we->buf + we->index;
+        int len = we->length - we->index;
+        if(!strcmp(buf, "action=parsegraph_createEnvironment")) {
+            parsegraph_GUID createdEnv;
+            parsegraph_EnvironmentStatus erv = parsegraph_createEnvironment(
+                resp->rb->session, resp->login.userId, 0, 0, &createdEnv);
+            if(erv != parsegraph_Environment_OK) {
+                return parsegraph_environmentStatusToHttp(erv);
+            }
+            char buf[4096];
+            int needed = snprintf(buf, sizeof buf,
+                "HTTP/1.1 303 See Other\r\nLocation: /environment/%s\r\n\r\n", createdEnv.value
+            );
+            int nwritten = marla_Connection_write(req->cxn, buf, needed);
+            if(nwritten < needed) {
+                if(nwritten > 0) {
+                    marla_Connection_putbackWrite(req->cxn, nwritten);
+                }
+                return marla_WriteResult_DOWNSTREAM_CHOKED;
+            }
+
+            while(marla_Ring_size(req->cxn->output) > 0) {
+                int nflushed;
+                marla_WriteResult wr = marla_Connection_flush(req->cxn, &nflushed);
+                if(wr != marla_WriteResult_CONTINUE) {
+                    return wr;
+                }
+            }
+
+            req->writeStage = marla_CLIENT_REQUEST_AFTER_RESPONSE;
+            return marla_WriteResult_CONTINUE;
+        }
+        else {
+            marla_killRequest(req, 400, "Unexpected input given in %s request.", req->method);
+            return marla_WriteResult_KILLED;
+        }
+    }
+    else if(we->length == 0) {
         req->writeStage = marla_CLIENT_REQUEST_DONE_READING;
         return marla_WriteResult_CONTINUE;
     }
@@ -82,90 +125,194 @@ void rainback_homepageHandler(struct marla_Request* req, enum marla_ClientEvent 
     }
 }
 
+static int printEnvironmentForGUID(mod_rainback* rb, rainback_Page* page, struct parsegraph_user_login* userLogin, parsegraph_GUID* env)
+{
+    // Get the title.
+    apr_pool_t* pool = rb->session->server->pool;
+    const char* envTitle = 0;
+    parsegraph_EnvironmentStatus erv = parsegraph_Environment_OK;
+    erv = parsegraph_getEnvironmentTitleForGUID(rb->session, env, &envTitle);
+    if(parsegraph_isSeriousEnvironmentError(erv)) {
+        marla_logMessagef(rb->session->server, "Failed to retrieve environment title for %s.", envTitle);
+        return parsegraph_environmentStatusToHttp(erv);
+    }
+
+    if(!envTitle) {
+        envTitle = env->value;
+    }
+
+    char buf[1024];
+    int len = snprintf(buf, sizeof buf, "<a href=\"%s\">%s</a>\n", apr_pstrcat(pool, "/environment/", env->value, NULL), envTitle);
+    rainback_Page_append(page, buf, len);
+    return 200;
+}
+
+static int printEnvironmentForId(mod_rainback* rb, rainback_Page* page, struct parsegraph_user_login* userLogin, int envId)
+{
+    parsegraph_GUID envGUID;
+    parsegraph_EnvironmentStatus erv;
+    erv = parsegraph_getEnvironmentGUIDForId(rb->session, envId, &envGUID);
+    switch(erv) {
+    case parsegraph_Environment_OK:
+        break;
+    case parsegraph_Environment_NOT_FOUND:
+        return 404;
+    default:
+        return parsegraph_environmentStatusToHttp(erv);
+    }
+
+    return printEnvironmentForGUID(rb, page, userLogin, &envGUID);
+}
+
+static int printEnvironmentList(mod_rainback* rb, rainback_Page* page, struct parsegraph_user_login* userLogin, apr_dbd_results_t* savedEnvGUIDs)
+{
+    apr_dbd_row_t* envRow = 0;
+    parsegraph_GUID guid;
+    guid.value[36] = 0;
+    rainback_Page_append(page, "<ul>", 4);
+    const apr_dbd_driver_t* driver = rb->session->dbd->driver;
+    apr_pool_t* pool = rb->session->server->pool;
+    while(0 == apr_dbd_get_row(driver, pool, savedEnvGUIDs, &envRow, -1)) {
+        const char* savedEnvGUID = apr_dbd_get_entry(driver, envRow, 0);
+        if(!savedEnvGUID) {
+            // No GUID for this record.
+            continue;
+        }
+        strncpy(guid.value, savedEnvGUID, 36);
+        rainback_Page_append(page, "<li>", 4);
+        printEnvironmentForGUID(rb, page, userLogin, &guid);
+    }
+    rainback_Page_append(page, "</ul>", 5);
+    return 0;
+}
+
+// Saved - All environments saved by the authenticated user
+static int printSavedEnvironments(mod_rainback* rb, rainback_Page* page, struct parsegraph_user_login* userLogin)
+{
+    apr_dbd_results_t* savedEnvGUIDs = 0;
+    parsegraph_EnvironmentStatus erv;
+    erv = parsegraph_getSavedEnvironmentGUIDs(rb->session, userLogin->userId, &savedEnvGUIDs);
+
+    char buf[1024];
+    int len = snprintf(buf, sizeof buf, "<h2>%s's saved environments</h2>", userLogin->username);
+    rainback_Page_append(page, buf, len);
+
+    if(parsegraph_isSeriousEnvironmentError(erv)) {
+        return parsegraph_environmentStatusToHttp(erv);
+    }
+    return printEnvironmentList(rb, page, userLogin, savedEnvGUIDs);
+}
+
+// Owned - All environments owned by the user if there are any environments owned by the authenticated user.
+static int printOwnedEnvironments(mod_rainback* rb, rainback_Page* page, struct parsegraph_user_login* userLogin)
+{
+    apr_dbd_results_t* envs = 0;
+    parsegraph_EnvironmentStatus erv;
+    erv = parsegraph_getOwnedEnvironmentGUIDs(rb->session, userLogin->userId, &envs);
+    char buf[1024];
+    int len = snprintf(buf, len, "<h2>%s's owned environments</h2>", userLogin->username);
+    rainback_Page_append(page, buf, len);
+    if(parsegraph_isSeriousEnvironmentError(erv)) {
+        return parsegraph_environmentStatusToHttp(erv);
+    }
+    return printEnvironmentList(rb, page, userLogin, envs);
+}
+
+// Invited - All invites for this user.
+/*static int printInvitedEnvironments(request_rec *r, struct parsegraph_user_login* userLogin)
+{
+    apr_dbd_results_t* savedEnvGUIDs;
+    ap_dbd_t* dbd = ap_dbd_acquire(r);
+    parsegraph_EnvironmentStatus erv;
+    erv = parsegraph_getInvitedEnvironmentGUIDs(r->pool, dbd, userLogin->userId, &savedEnvGUIDs);
+    if(parsegraph_isSeriousEnvironmentError(erv)) {
+        return parsegraph_environmentStatusToHttp(erv);
+    }
+    return printEnvironmentList(r, dbd, userLogin, savedEnvGUIDs);
+}
+*/
+
+// TODO Implement these queries.
+// Online - All friends who are online.
+// Administration - All environments flagged 'admin' if the user is also an administrator.
+// Top - Only one exists per server.
+// Recent - Top X environments accessible to the user if there are any environments visited by the user.
+// Watched X - Top X environments tagged with name. One group shown for each watched tag.
+// Subscribed X - Top X environments owned by X. One group shown for each subscribed user.
+// Featured - Top X environments flagged 'featured' if there are any featured environments.
+// Starting - All environments flagged 'starting' if user is less than X time created.
+// New - Top X newest environments
+// Random - X random environments if there are at least 5*X environments.
+// Most Popular - X most popular environments (If there are at least X environments and at least Y hits for any environment.)
+// Private - All environments private to the user if there are any non-public environments with a permission set for the authenticated user.
+// Published - All environments published by the user if there are any public environments owned by the authenticated user.
+
+static void* ownedEnvironments(rainback_Template* tp, rainback_Context* context, void** savePtr)
+{
+    if(*savePtr) {
+        // Continue.
+        apr_dbd_results_t* savedEnvGUIDs = *savePtr;
+    }
+    else {
+        // Initialize.
+        apr_dbd_results_t* savedEnvGUIDs = *savePtr;
+        parsegraph_EnvironmentStatus erv = parsegraph_getOwnedEnvironmentGUIDs(
+            tp->rb->session, userLogin->userId, &savedEnvGUIDs);
+        *savePtr = savedEnvGUIDs;
+
+        apr_dbd_row_t* envRow = 0;
+        if(0 == apr_dbd_get_row(driver, pool, savedEnvGUIDs, &envRow, -1)) {
+            const char* savedEnvGUID = apr_dbd_get_entry(driver, envRow, 0);
+            if(!savedEnvGUID) {
+                // No GUID for this record.
+                continue;
+            }
+            return savedEnvGUID;
+        }
+        else {
+            return 0;
+        }
+    }
+}
+
+static void* savedEnvironments(rainback_Template* tp, apr_hash_t* context, void** savePtr)
+{
+    if(*savePtr) {
+        // Continue.
+    }
+    else {
+        // Initialize.
+    }
+}
+
 static void rainback_generateUserpage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
 {
-    char fullResponse[8*8192];
-    memset(fullResponse, 0, sizeof fullResponse);
-    char part[8192];
-    int len = snprintf(part, sizeof part,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>%s</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "</style>"
-"</head>"
-"<body>"
-"<nav>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-"</nav>"
-"<main>"
-    "<div class=links>"
-        "<form id=search action=\"/search\">"
-        "<input name=q></input> <input type=submit value=Search></input>"
-        "</form>"
-        "<form id=logout method=post action=\"/logout\"><input type=submit value=\"Log out\"></form> "
-        "<a href=\"/profile\"><span class=\"bud\">Profile</span></a> "
-        "<a href=\"/import\"><span class=\"bud import-button\">Import</span></a>"
-    "</div>"
-    "<div class=block style=\"clear:both; overflow: hidden\">"
-    "<h1>%s</h1>"
-    "<p>"
-"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed urna purus, tempus in fermentum nec, blandit blandit nunc. Mauris aliquam augue ac faucibus faucibus. Cras faucibus molestie augue a interdum. Maecenas laoreet magna lectus, eget pharetra magna pharetra et. Ut eu mi placerat, interdum diam ac, tristique odio. Nulla facilisi. Vestibulum eu nisi accumsan, vehicula felis at, rutrum felis. Cras id nunc est. Aenean nec gravida dolor. Aenean velit erat, tempus non aliquam vehicula, sagittis vel mi. Aenean facilisis efficitur risus, fermentum lobortis massa porttitor at. Nulla facilisi. Curabitur metus nulla, mollis vel purus in, eleifend accumsan eros. Sed accumsan sed leo eu porttitor. Vestibulum erat dui, lobortis in ornare id, sodales porttitor nunc. Nam vestibulum, ipsum lacinia vulputate malesuada, sapien dolor iaculis mi, quis scelerisque enim libero ut ipsum."
-"<p>"
-"Fusce ante augue, volutpat et nunc vitae, accumsan laoreet massa. Aliquam erat volutpat. Fusce pharetra, sem ut aliquet hendrerit, lacus massa pulvinar diam, sit amet imperdiet mi magna eget neque. Duis vel nisl velit. Donec condimentum lacus eget euismod faucibus. Sed imperdiet eros non ex dapibus tincidunt id eu orci. Vivamus eu ante nibh."
-"<p>"
-"Vivamus maximus libero ut placerat mollis. Fusce in blandit eros. Suspendisse dui mauris, cursus in massa vitae, vestibulum tincidunt sapien. Sed euismod elit in dolor semper ullamcorper. Praesent vehicula velit in fermentum hendrerit. Praesent molestie ligula eget leo vulputate, id mollis sapien finibus. Pellentesque quam mi, varius sed dapibus in, iaculis non ligula. Nulla enim quam, iaculis et massa vitae, suscipit pretium tellus."
-"<p>"
-"In suscipit efficitur orci, vel lacinia tellus elementum ac. Cras justo diam, blandit sit amet tincidunt quis, tristique id turpis. Fusce ac libero eleifend, efficitur diam et, faucibus tortor. Donec eu ligula neque. Phasellus mollis at turpis vitae sagittis. Nunc eros mi, lobortis sit amet nisl sed, mattis vestibulum quam. Duis a pellentesque massa. Nunc vitae ipsum consectetur, rhoncus est imperdiet, ultrices erat. Integer in bibendum libero. Donec semper odio sem, in semper neque pellentesque sed. Suspendisse elementum ipsum quis magna fringilla, ut condimentum metus vehicula. Vivamus maximus pharetra mattis. Mauris a tincidunt ante, quis molestie est. Nam convallis pharetra sagittis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Nulla eget pretium felis."
-"<p>"
-"Sed pharetra elit libero, vel interdum massa posuere vel. Ut malesuada rutrum blandit. Sed ut nunc eu ligula semper molestie. Curabitur pulvinar felis eros, eget sollicitudin ligula dignissim bibendum. Aliquam vehicula lectus vitae congue fringilla. Nunc at magna non tellus tincidunt dictum. In pharetra, felis mattis sollicitudin pharetra, augue elit dictum tortor, eu imperdiet lectus risus hendrerit ex. Praesent consequat bibendum mauris at facilisis. Quisque tincidunt sodales porta. Vivamus accumsan mi ut vehicula auctor. Mauris consequat lectus vel fringilla tempus. Quisque interdum, quam vitae ultrices fringilla, enim justo varius lorem, in pulvinar mi tortor a arcu. Praesent condimentum augue in dolor venenatis, at imperdiet quam dignissim. Phasellus feugiat justo sed lectus ultrices, sit amet lacinia erat mollis. Aliquam nec diam nisl. Vestibulum sit amet eros at mi imperdiet sagittis nec interdum ligula.",
-    (login && login->username) ? login->username : "Rainback",
-    (login && login->username) ? login->username : "no one",
-    (login && login->username) ? login->username : "Anonymous");
-    size_t bodylen = strlen(part);
-    strcat(fullResponse, part);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
 
-    /*for( each user environment) {
-        len = snprintf(part, sizeof part,
-        "<div>"
-        "Environment X"
-        "</div>"
-        );
-        bodylen += strlen(part);
-        strcat(fullResponse, part);
-    }*/
-
-    len = snprintf(part, sizeof part,
-    "</div>"
-"</main>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved. <a href=/contact><span class=\"bud\">Contact Us</span></a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    bodylen += strlen(part);
-    strcat(fullResponse, part);
+    // Render the response body from the template.
+    apr_hash_t* context = apr_hash_make(pool);
+    apr_hash_set(context, "title", APR_HASH_KEY_STRING,
+        (login && login->username) ? login->username : "Rainback");
+    apr_hash_set(context, "username", APR_HASH_KEY_STRING,
+        (login && login->username) ? login->username : "Anonymous");
+    apr_hash_set(context, "saved_environments", APR_HASH_KEY_STRING, savedEnvironments);
+    apr_hash_set(context, "owned_environments", APR_HASH_KEY_STRING, ownedEnvironments);
+    rainback_renderTemplate(rb, "userpage.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, fullResponse, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 void rainback_generateHomepage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
@@ -174,59 +321,23 @@ void rainback_generateHomepage(rainback_Page* page, mod_rainback* rb, const char
         return rainback_generateUserpage(page, rb, pageState, login);
     }
 
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Rainback</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-"</head>"
-"<body>"
-"<nav>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div style=\"text-align: center\">"
-    "</div>"
-    "<p style=\"text-align: center\">"
-    "</p>"
-"</nav>"
-"<main>"
-    "<div class=links>"
-        "<form id=search action=\"/search\">"
-        "<input name=q></input> <input type=submit value=Search></input>"
-        "</form>"
-        "<a href=/login><span class=\"bud\" style=\"background-color: greenyellow\">Log in</span></a> "
-        "<a href=/signup><span class=\"bud\" style=\"background-color: gold\">Sign up</span></a> "
-        "<a href=\"/import\"><span class=\"bud\">Import</span></a>"
-    "</div>"
-    "<div class=block style=\"clear:both\">"
-        "<h1>Rainback</h1>"
-        "<video controls=\"true\" style=\"width:100%\" src=\"rainback-on-fedora-from-scratch.webm\"></video>"
-        "</div>"
-"</main>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved. <a href=/contact><span class=\"bud\">Contact Us</span></a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+    apr_hash_t* context = apr_hash_make(pool);
+    rainback_renderTemplate(rb, "homepage.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+
+    apr_pool_destroy(pool);
 }

@@ -25,6 +25,8 @@ make
 %install
 mkdir -p %{buildroot}/%{_libdir}
 cp mod_rainback.so %{buildroot}/%{_libdir}
+cp templates/*.html %{buildroot}/%{_datadir}/parsegraph/templates/*
 
 %files
 %{_libdir}/mod_rainback.so
+%{_datadir}/parsegraph/templates/*

@@ -16,6 +16,7 @@ struct mod_rainback {
 parsegraph_Session* session;
 parsegraph_Session* worldSession;
 apr_hash_t* cache;
+apr_hash_t* templates;
 };
 typedef struct mod_rainback mod_rainback;
 mod_rainback* mod_rainback_new(marla_Server* server);
@@ -49,6 +50,7 @@ void rainback_pageHandler(struct marla_Request* req, enum marla_ClientEvent ev, 
 void rainback_generatePage(rainback_Page* page, mod_rainback* rb, const char* urlState, const char* url, parsegraph_user_login* login);
 rainback_Page* rainback_getPage(mod_rainback* rb, const char* urlState, const char* url, parsegraph_user_login* login);
 rainback_Page* rainback_getPageByKey(mod_rainback* rb, const char* cacheKey);
+void rainback_removePageFromCache(mod_rainback* rb, const char* cacheKey);
 
 // Login
 struct rainback_LoginResponse;
@@ -109,18 +111,6 @@ void rainback_subscribeHandler(struct marla_Request* req, enum marla_ClientEvent
 
 int rainback_authenticateByCookie(marla_Request* req, mod_rainback* rb, parsegraph_user_login* login, char* cookie);
 
-struct rainback_ContactHandlerData {
-mod_rainback* rb;
-};
-typedef struct rainback_ContactHandlerData rainback_ContactHandlerData;
-rainback_ContactHandlerData* rainback_ContactHandlerData_new(marla_Request* req, mod_rainback* rb);
-
-struct rainback_ImportHandlerData {
-mod_rainback* rb;
-};
-typedef struct rainback_ImportHandlerData rainback_ImportHandlerData;
-rainback_ImportHandlerData* rainback_ImportHandlerData_new(marla_Request* req, mod_rainback* rb);
-
 struct rainback_HomepageResponse;
 typedef struct rainback_HomepageResponse rainback_HomepageResponse;
 rainback_HomepageResponse* rainback_HomepageResponse_new(marla_Request* req, mod_rainback* rb);
@@ -134,12 +124,6 @@ mod_rainback* rb;
 typedef struct rainback_UserHandlerData rainback_UserHandlerData;
 rainback_UserHandlerData* rainback_UserHandlerData_new(marla_Request* req, mod_rainback* rb);
 
-struct rainback_SearchHandlerData {
-mod_rainback* rb;
-};
-typedef struct rainback_SearchHandlerData rainback_SearchHandlerData;
-rainback_SearchHandlerData* rainback_SearchHandlerData_new(marla_Request* req, mod_rainback* rb);
-
 struct rainback_PaymentHandlerData {
 mod_rainback* rb;
 };
@@ -152,11 +136,12 @@ mod_rainback* rb;
 typedef struct rainback_EnvironmentHandlerData rainback_EnvironmentHandlerData;
 rainback_EnvironmentHandlerData* rainback_EnvironmentHandlerData_new(marla_Request* req, mod_rainback* rb);
 
-struct rainback_SubscribeHandlerData {
-mod_rainback* rb;
-};
-typedef struct rainback_SubscribeHandlerData rainback_SubscribeHandlerData;
-rainback_SubscribeHandlerData* rainback_SubscribeHandlerData_new(marla_Request* req, mod_rainback* rb);
+struct rainback_SubscribeResponse;
+typedef struct rainback_SubscribeResponse rainback_SubscribeResponse;
+rainback_SubscribeResponse* rainback_SubscribeResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_SubscribeResponse_destroy(rainback_SubscribeResponse* resp);
+void rainback_generateSubscribePage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login);
+
 rainback_Page* rainback_getKilledPage(mod_rainback* rb, int statusCode, const char* reason);
 
 #include "marla.h"
@@ -201,5 +186,102 @@ void rainback_live_environment_install(mod_rainback* rb, marla_Request* req);
 
 int mod_rainback_acquireWorldStream(mod_rainback* rb);
 int mod_rainback_releaseWorldStream(mod_rainback* rb, int commit);
+
+struct rainback_EnvironmentResponse;
+typedef struct rainback_EnvironmentResponse rainback_EnvironmentResponse;
+
+rainback_EnvironmentResponse* rainback_EnvironmentResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_EnvironmentResponse_destroy(rainback_EnvironmentResponse* resp);
+void rainback_generateEnvironmentPage(rainback_Page* page, mod_rainback* rb);
+
+struct rainback_AuthenticateResponse;
+typedef struct rainback_AuthenticateResponse rainback_AuthenticateResponse;
+
+rainback_AuthenticateResponse* rainback_AuthenticateResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_AuthenticateResponse_destroy(rainback_AuthenticateResponse* resp);
+void rainback_authenticateHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+struct rainback_TemplateStep;
+typedef struct rainback_TemplateStep rainback_TemplateStep;
+struct rainback_Template;
+typedef struct rainback_Template rainback_Template;
+
+struct rainback_TemplateStep {
+void(*render)(mod_rainback*, rainback_Page*, apr_hash_t*, void*);
+void* renderData;
+rainback_TemplateStep* nextStep;
+};
+
+struct rainback_TemplateProcessor {
+void(*templateCommand)(rainback_Template* template, const char* command, void* procData);
+void(*addStep)(rainback_Template* template, rainback_TemplateStep*, void* procData);
+void* procData;
+struct rainback_TemplateProcessor* prevProcessor;
+};
+typedef struct rainback_TemplateProcessor rainback_TemplateProcessor;
+
+struct rainback_Template {
+apr_pool_t* pool;
+const char* path;
+mod_rainback* rb;
+rainback_TemplateProcessor* processor;
+rainback_TemplateStep* firstStep;
+rainback_TemplateStep* lastStep;
+marla_FileEntry* fe;
+rainback_Page* renderedPage;
+};
+
+enum TemplateParseStage {
+TemplateParseStage_STATIC,
+TemplateParseStage_COMMAND
+};
+
+// Template
+rainback_Template* rainback_Template_new(mod_rainback* rb);
+void rainback_Template_parseString(rainback_Template* te, unsigned char* str);
+void rainback_Template_parseFile(rainback_Template* te, const char* path, const char* watchpath);
+rainback_TemplateStep* rainback_makeTemplateStep(rainback_Template* te);
+void rainback_Template_destroy(rainback_Template* te);
+void rainback_Template_stringContent(rainback_Template* te, const char* content);
+void rainback_Template_mappedContent(rainback_Template* te, const char* key);
+void rainback_renderTemplate(mod_rainback* rb, const char* name, apr_hash_t* context, rainback_Page* page);
+void rainback_Template_render(rainback_Template* te, apr_hash_t* context, rainback_Page* page);
+
+struct rainback_SearchResponse;
+typedef struct rainback_SearchResponse rainback_SearchResponse;
+rainback_SearchResponse* rainback_SearchResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_SearchResponse_destroy(rainback_SearchResponse* resp);
+void rainback_generateSearchPage(rainback_Page* page, mod_rainback* rb, const char* uri);
+void rainback_SearchHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+// Forgot password
+struct rainback_ForgotPasswordResponse;
+typedef struct rainback_ForgotPasswordResponse rainback_ForgotPasswordResponse;
+rainback_ForgotPasswordResponse* rainback_ForgotPasswordResponse_new(mod_rainback* rb);
+void rainback_ForgotPasswordResponse_destroy(rainback_ForgotPasswordResponse* resp);
+void rainback_generateForgotPasswordPage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login);
+void rainback_ForgotPasswordHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+// Import
+struct rainback_ImportResponse;
+typedef struct rainback_ImportResponse rainback_ImportResponse;
+rainback_ImportResponse* rainback_ImportResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_ImportResponse_destroy(rainback_ImportResponse* resp);
+void rainback_generateImportPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login);
+void rainback_ImportHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+// Contact
+struct rainback_ContactResponse;
+typedef struct rainback_ContactResponse rainback_ContactResponse;
+rainback_ContactResponse* rainback_ContactResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_ContactResponse_destroy(rainback_ContactResponse* resp);
+void rainback_generateContactPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login);
+void rainback_ContactHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+enum rainback_VariableType {
+rainback_VariableType_STRING,
+rainback_VariableType_ENUMERABLE,
+rainback_VariableType_HASH
+};
 
 #endif // mod_rainback_INCLUDED

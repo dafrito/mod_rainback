@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title><%=title%></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="rainback.css">
+    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+</head>
+<body>
+<nav>
+    <p style="text-align: center">
+    <a href="/"><img id=logo src="nav-side-logo.png"></img></a>
+    </p>
+</nav>
+<main>
+    <div class="links">
+        <form id="search" action="/search">
+        <input name="q"></input> <input type="submit" value="Search"></input>
+        </form>
+        <form id="logout" method="post" action="/logout" style="display: inline-block"><input type="submit" value="Log out"></form>
+        <a href="/profile"><span class="bud">Profile</span></a>
+        <a href="/import"><span class="bud import-button">Import</span></a>
+    </div>
+
+    <div class="block" style="clear:both; overflow: hidden">
+    <h1><%=username%></h1>
+    <p>
+    <video controls="true" style="width:100%" src="rainback-on-fedora-from-scratch.webm"></video>
+    <p>
+    <form method="post">
+    <input type="hidden" name="action" value="parsegraph_createEnvironment">
+    <input style="font-size: 1.5em" type="submit" value="Create New Environment">
+    </form>
+    </div>
+    <!-- Saved - All environments saved by the authenticated user -->
+    <!-- < % foreach env in saved_environments %>
+        < % show_env env %>
+    < % endfor %> -->
+    <!-- Invited - All invites for this user.
+    // Online - All friends who are online.
+    // Administration - All environments flagged 'admin' if the user is also an administrator.
+    // Top - Only one exists per server.
+    // Recent - Top X environments accessible to the user if there are any environments visited by the user.
+    // Watched X - Top X environments tagged with name. One group shown for each watched tag.
+    // Subscribed X - Top X environments owned by X. One group shown for each subscribed user.
+    // Featured - Top X environments flagged 'featured' if there are any featured environments
+    // Starting - All environments flagged 'starting' if user is less than X time created.
+    // New - Top X newest environments
+    // Random - X random environments if there are at least 5*X environments.
+    // Most Popular - X most popular environments (If there are at least X environments and at least Y hits for any environment.)
+    // Private - All environments private to the user if there are any non-public environments with a permission set for the authenticated user. -->
+    <!-- Owned - All environments owned by the user if there are any environments owned by the authenticated user. -->
+    <!-- < % foreach env in owned_environments %>
+        < % show_env env %>
+    < % endfor %> -->
+    <!-- Published - All environments published by the user if there are any public environments owned by the authenticated user. -->
+</main>
+<div style="clear: both"></div>
+<div style="display: block; text-align: center; margin: 1em 0">
+    <div class=slot style="display: inline-block;">
+        &copy; 2018 <a href="https://rainback.com">Rainback, Inc.</a> All rights reserved. <a href=/contact><span class="bud">Contact Us</span></a>
+    </div>
+</div>
+</body>
+</html>

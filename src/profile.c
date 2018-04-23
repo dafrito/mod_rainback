@@ -12,6 +12,7 @@ typedef struct rainback_ProfileResponse rainback_ProfileResponse;
 rainback_ProfileResponse* rainback_ProfileResponse_new(mod_rainback* rb)
 {
     rainback_ProfileResponse* resp = malloc(sizeof(*resp));
+    memset(&resp->login, 0, sizeof(resp->login));
     resp->rb = rb;
     return resp;
 }
@@ -23,73 +24,30 @@ void rainback_ProfileResponse_destroy(rainback_ProfileResponse* resp)
 
 void rainback_generateProfilePage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
 {
-    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
-    memset(encodedUsername, 0, sizeof(encodedUsername));
-    apr_escape_entity(encodedUsername, login->username, APR_ESCAPE_STRING, 1, 0);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
 
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>%s</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-"#profile {\n"
-"overflow: hidden;\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-"<nav>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-"</nav>"
-"<main>"
-    "<div class=links>"
-        "<form id=search action=\"/search\">"
-        "<input name=q></input> <input type=submit value=Search></input>"
-        "</form>"
-        "<form id=logout method=post action=\"/logout\"><input type=submit value=\"Log out\"></form> "
-        "<a href=\"/profile\"><span class=\"bud\">Profile</span></a> "
-        "<a href=\"/import\"><span class=\"bud import-button\">Import</span></a>"
-    "</div>"
-    "<div class=block style=\"clear:both; overflow: hidden\">"
-        "<h1>%s</h1>"
-"<div class=slot style=\"float: right; padding-left: 1em; padding-bottom: 1em\">"
-"<b>User Management</b><br/>"
-"<ul style=\"margin: 0; margin-top: 1em;\">"
-"<li><a href=\"/account\">User Account</a></li>"
-"<li><a href=\"/subscribe\">Subscription</a></li>"
-"<li><a href=\"/payment\">Payments</a></li>"
-"</ul>"
-"</div>"
-"</main>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</body>"
-"</html>",
-encodedUsername,
-encodedUsername
-    );
-    size_t bodylen = strlen(body);
+    // Render the response body from the template.
+    apr_hash_t* context = apr_hash_make(pool);
+    apr_hash_set(context, "title", APR_HASH_KEY_STRING,
+        (login && login->username) ? login->username : "Rainback");
+    apr_hash_set(context, "username", APR_HASH_KEY_STRING,
+        (login && login->username) ? login->username : "Anonymous");
+    rainback_renderTemplate(rb, "profile.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 static marla_WriteResult readProfileForm(mod_rainback* rb, marla_Request* req, char* buf, size_t buflen, parsegraph_user_login* login)

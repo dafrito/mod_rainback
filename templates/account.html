@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title><%=title%></title>
+    <link rel="stylesheet" type="text/css" href="rainback.css">
+    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+    <style>
+#login {
+width: 50%;
+margin: auto;
+box-sizing: border-box;
+}
+
+@media only screen and (max-width: 600px) {
+#login {
+width: 100%;
+box-sizing: border-box;
+}
+}
+</style>
+</head>
+<body>
+<nav>
+    <p style="text-align: center">
+    <a href=/><img id=logo src="nav-side-logo.png"></img></a>
+    </p>
+</nav>
+<main>
+    <div class=links>
+        <form id=search action="/search">
+        <input name=q></input> <input type=submit value=Search></input>
+        </form>
+        <form id=logout method=post action="/logout" style="display: inline-block">
+            <input type=submit value="Log out">
+        </form>
+        <a href="/profile"><span class="bud">Profile</span></a>
+        <a href="/import"><span class="bud import-button">Import</span></a>
+    </div>
+    <div class=block style="clear:both; overflow: hidden">
+        <h1><%=username%></h1>
+</main>
+<div style="clear: both"></div>
+<div style="display: block; text-align: center; margin: 1em 0">
+    <div class=slot style="display: inline-block;">
+        &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>
+    </div>
+</div>
+</body>
+</html>

@@ -2,3 +2,4 @@ mod_rainback.so
 mod_rainback.spec
 rpm.sh
 vgcore.*
+test_mod_rainback
