@@ -1,29 +1,3 @@
-// Template is created with a given template path.
-// Template is used with a given context to construct a page.
-// The template is rebuilt when its template path changes (depends on inotify)
-// The template represents the compiled template with an AST.
-// Each template AST node knows how to build itself.
-// The whole template is constructed with a visitor.
-
-// Template(name, path)
-// Template("user", "/usr/parsegraph/templates/user.html")
-
-// Template AST node types:
-// 1. Inline content (implied)
-// 2. Content from other templates (by name if no dot, by path otherwise)
-// 3. Content from template hashmap. (Hashmap provided from request that populates it)
-//
-// APR_HASH_SET(ctx, ..)
-// APR_HASH_SET(ctx, "username", username)
-// APR_HASH_SET(ctx, ..)
-// rainback_invokeTemplate("user", ctx)
-
-// You are <% username %>.
-
-// Templates are used during generation to allow creation of HTML pages without needing
-// to escape the text in C.
-
-// Templates are used to generate HTTP bodies and not headers.
 #include "mod_rainback.h"
 #include <apr_strings.h>
 
@@ -396,7 +370,6 @@ void rainback_Template_destroy(rainback_Template* template)
     free(template);
 }
 
-// step->render(rb, page, step->renderData);
 static void renderStringContent(mod_rainback* rb, rainback_Page* page, rainback_Context* context, void* stepData)
 {
     rainback_Page_append(page, stepData, strlen(stepData));
@@ -409,7 +382,6 @@ void rainback_Template_stringContent(rainback_Template* template, const char* co
     step->renderData = (void*)apr_pstrdup(template->pool, content);
 }
 
-// step->render(rb, page, step->renderData);
 static void renderMappedContent(mod_rainback* rb, rainback_Page* page, rainback_Context* context, void* stepData)
 {
     const char* val = rainback_Context_getString(context, stepData);
