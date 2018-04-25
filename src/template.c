@@ -27,6 +27,15 @@
 #include "mod_rainback.h"
 #include <apr_strings.h>
 
+static rainback_TemplateStep* rainback_makeTemplateStep(rainback_Template* template)
+{
+    rainback_TemplateStep* step = apr_palloc(template->pool, sizeof(rainback_TemplateStep));
+    step->render = 0;
+    step->renderData = 0;
+    step->nextStep = 0;
+    return step;
+}
+
 static rainback_TemplateStep* rainback_Template_addStep(rainback_Template* template)
 {
     rainback_TemplateStep* step = rainback_makeTemplateStep(template);
@@ -45,7 +54,7 @@ static rainback_TemplateStep* rainback_Template_addStep(rainback_Template* templ
     return step;
 }
 
-void rainback_Template_addTemplateProcessor(rainback_Template* template, rainback_TemplateProcessor* proc)
+static void rainback_Template_addTemplateProcessor(rainback_Template* template, rainback_TemplateProcessor* proc)
 {
     rainback_TemplateProcessor* lastProc = template->processor;
     if(lastProc) {
@@ -54,7 +63,7 @@ void rainback_Template_addTemplateProcessor(rainback_Template* template, rainbac
     template->processor = proc;
 }
 
-void rainback_Template_removeTemplateProcessor(rainback_Template* template)
+static void rainback_Template_removeTemplateProcessor(rainback_Template* template)
 {
     if(!template->processor) {
         return;
@@ -67,7 +76,7 @@ static void renderTemplateContent(mod_rainback* rb, rainback_Page* page, rainbac
     rainback_renderTemplate(rb, stepData, context, page);
 }
 
-void rainback_Template_includeTemplate(rainback_Template* template, const char* content)
+static void rainback_Template_includeTemplate(rainback_Template* template, const char* content)
 {
     rainback_TemplateStep* step = rainback_Template_addStep(template);
     step->render = renderTemplateContent;
@@ -79,6 +88,13 @@ rainback_Template* tp;
 char varname[128];
 char list[128];
 rainback_Page* upperPage;
+rainback_TemplateStep* firstStep;
+rainback_TemplateStep* lastStep;
+};
+
+struct ifData {
+rainback_Template* tp;
+char varname[128];
 rainback_TemplateStep* firstStep;
 rainback_TemplateStep* lastStep;
 };
@@ -95,32 +111,77 @@ static void addForeachStep(rainback_Template* te, rainback_TemplateStep* step, v
     d->lastStep = step;
 }
 
+static void addIfStep(rainback_Template* te, rainback_TemplateStep* step, void* procData)
+{
+    struct ifData* d = procData;
+    if(d->lastStep) {
+        d->lastStep->nextStep = step;
+    }
+    else {
+        d->firstStep = step;
+    }
+    d->lastStep = step;
+}
+
 static void renderForeachContent(mod_rainback* rb, rainback_Page* page, rainback_Context* context, void* stepData)
 {
     struct foreachData* d = stepData;
 
-    rainback_Iteration iter;
-    void*(*enumerator)(rainback_Template*, rainback_Context*, rainback_Iteration*) = rainback_Context_enumerate(context, d->list, &iter);
-
-    void* oldValue = apr_hash_get(context, d->varname, APR_HASH_KEY_STRING);
-
+    void* givenState;
+    rainback_Enumerator enumerator = rainback_Context_getEnumerator(context, d->list, &givenState);
+    rainback_Context* ctx = rainback_Context_new(context->pool);
+    rainback_Context_setParent(ctx, context);
+    void* savePtr = 0;
+    void* next = 0;
     void* val = 0;
     for(;;) {
-        val = enumerator(d->tp, context, &iter);
-        if(!val) {
+        if(!next && !val) {
+            val = enumerator(d->tp, ctx, &savePtr, givenState);
+            if(!val) {
+                // Nothing at all.
+                break;
+            }
+            rainback_Context_setString(ctx, "first", "");
+            val = apr_pstrdup(d->tp->pool, val);
+            next = enumerator(d->tp, ctx, &savePtr, givenState);
+        }
+        else {
+            rainback_Context_blank(ctx, "first");
+            val = apr_pstrdup(d->tp->pool, next);
+            next = enumerator(d->tp, ctx, &savePtr, givenState);
+        }
+        if(!next) {
+            rainback_Context_setString(ctx, "last", "");
+        }
+        else {
+            rainback_Context_blank(ctx, "last");
+        }
+
+        rainback_Context_setString(ctx, d->varname, val);
+
+        // Process each step.
+        for(rainback_TemplateStep* step = d->firstStep; step; step = step->nextStep) {
+            step->render(rb, page, ctx, step->renderData);
+        }
+        if(val && !next) {
             break;
         }
-        apr_hash_set(context, d->varname, APR_HASH_KEY_STRING, val);
+    }
+}
 
+static void renderConditional(mod_rainback* rb, rainback_Page* page, rainback_Context* context, void* stepData)
+{
+    struct ifData* d = stepData;
+    rainback_Variable* var = rainback_Context_getVariable(context, d->varname);
+    if(var && var->type != rainback_VariableType_BLANK) {
         // Process each step.
         for(rainback_TemplateStep* step = d->firstStep; step; step = step->nextStep) {
             step->render(rb, page, context, step->renderData);
         }
     }
-    apr_hash_set(context, d->varname, APR_HASH_KEY_STRING, oldValue);
 }
 
-void rainback_Template_beginForeach(rainback_Template* template, const char* varname, const char* list)
+static void rainback_Template_beginForeach(rainback_Template* template, const char* varname, const char* list)
 {
     rainback_TemplateProcessor* proc = apr_palloc(template->pool, sizeof(rainback_TemplateProcessor));
     proc->templateCommand = 0;
@@ -143,12 +204,39 @@ void rainback_Template_beginForeach(rainback_Template* template, const char* var
     rainback_Template_addTemplateProcessor(template, proc);
 }
 
-void rainback_Template_endForeach(rainback_Template* template)
+static void rainback_Template_endForeach(rainback_Template* template)
 {
     rainback_Template_removeTemplateProcessor(template);
 }
 
-void rainback_processCommand(rainback_Template* template, char* str)
+static void rainback_Template_endIf(rainback_Template* template)
+{
+    rainback_Template_removeTemplateProcessor(template);
+}
+
+static void rainback_Template_beginIf(rainback_Template* template, const char* varname)
+{
+    rainback_TemplateProcessor* proc = apr_palloc(template->pool, sizeof(rainback_TemplateProcessor));
+    proc->templateCommand = 0;
+    proc->addStep = addIfStep;
+    proc->prevProcessor = 0;
+
+    struct ifData* d = apr_palloc(template->pool, sizeof(struct ifData));
+    strncpy(d->varname, varname, sizeof(d->varname));
+    proc->procData = d;
+
+    rainback_TemplateStep* step = rainback_Template_addStep(template);
+    step->render = renderConditional;
+    step->renderData = d;
+
+    d->tp = template;
+    d->firstStep = 0;
+    d->lastStep = 0;
+
+    rainback_Template_addTemplateProcessor(template, proc);
+}
+
+static void rainback_processCommand(rainback_Template* template, char* str)
 {
     char* cmdPtr;
     char* command = strtok_r(str, " ", &cmdPtr);
@@ -156,6 +244,15 @@ void rainback_processCommand(rainback_Template* template, char* str)
         // include <template>
         char* name = strtok_r(0, " ", &cmdPtr);
         rainback_Template_includeTemplate(template, name);
+    }
+    else if(!strcasecmp(command, "if")) {
+        // if <varname>
+        char* varname = strtok_r(0, " ", &cmdPtr);
+        rainback_Template_beginIf(template, varname);
+    }
+    else if(!strcasecmp(command, "endif")) {
+        // endif
+        rainback_Template_endIf(template);
     }
     else if(!strcasecmp(command, "foreach")) {
         // foreach <varname> in <list>
@@ -192,7 +289,7 @@ void rainback_processCommand(rainback_Template* template, char* str)
     }
 }
 
-void rainback_Template_processTemplateWord(rainback_Template* template, unsigned char* content)
+static void rainback_Template_processTemplateWord(rainback_Template* template, unsigned char* content)
 {
     rainback_TemplateProcessor* proc = template->processor;
     if(proc && proc->templateCommand) {
@@ -292,15 +389,6 @@ void rainback_Template_parseFile(rainback_Template* template, const char* filepa
     rainback_Template_parseString(template, fe->data);
 }
 
-rainback_TemplateStep* rainback_makeTemplateStep(rainback_Template* template)
-{
-    rainback_TemplateStep* step = apr_palloc(template->pool, sizeof(rainback_TemplateStep));
-    step->render = 0;
-    step->renderData = 0;
-    step->nextStep = 0;
-    return step;
-}
-
 void rainback_Template_destroy(rainback_Template* template)
 {
     marla_FileEntry_free(template->fe);
@@ -324,7 +412,7 @@ void rainback_Template_stringContent(rainback_Template* template, const char* co
 // step->render(rb, page, step->renderData);
 static void renderMappedContent(mod_rainback* rb, rainback_Page* page, rainback_Context* context, void* stepData)
 {
-    const char* val = rainback_Variable_getString(context, stepData);
+    const char* val = rainback_Context_getString(context, stepData);
     if(val) {
         rainback_Page_append(page, val, strlen(val));
     }

@@ -30,7 +30,7 @@ void rainback_Page_endHead(rainback_Page* page)
     page->headBoundary = page->length;
 }
 
-int rainback_Page_prepend(rainback_Page* page, void* buf, size_t len)
+int rainback_Page_prepend(rainback_Page* page, const void* buf, size_t len)
 {
     while(page->capacity < page->length + len) {
         page->data = realloc(page->data, page->capacity * 2);
@@ -45,12 +45,12 @@ int rainback_Page_prepend(rainback_Page* page, void* buf, size_t len)
     return len;
 }
 
-int rainback_Page_write(rainback_Page* page, void* buf, size_t len)
+int rainback_Page_write(rainback_Page* page, const void* buf, size_t len)
 {
     return rainback_Page_append(page, buf, len);
 }
 
-int rainback_Page_append(rainback_Page* page, void* buf, size_t len)
+int rainback_Page_append(rainback_Page* page, const void* buf, size_t len)
 {
     while(page->capacity < page->length + len) {
         page->data = realloc(page->data, page->capacity * 2);

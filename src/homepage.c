@@ -247,42 +247,38 @@ static int printOwnedEnvironments(mod_rainback* rb, rainback_Page* page, struct 
 // Private - All environments private to the user if there are any non-public environments with a permission set for the authenticated user.
 // Published - All environments published by the user if there are any public environments owned by the authenticated user.
 
-static void* ownedEnvironments(rainback_Template* tp, rainback_Context* context, void** savePtr)
+static void* ownedEnvironments(rainback_Template* tp, rainback_Context* context, void** savePtr, void* dataPtr)
 {
-    if(*savePtr) {
-        // Continue.
-        apr_dbd_results_t* savedEnvGUIDs = *savePtr;
-    }
-    else {
-        // Initialize.
-        apr_dbd_results_t* savedEnvGUIDs = *savePtr;
+    parsegraph_user_login* userLogin = dataPtr;
+    apr_dbd_results_t* savedEnvGUIDs = *savePtr;
+    if(!savedEnvGUIDs) {
         parsegraph_EnvironmentStatus erv = parsegraph_getOwnedEnvironmentGUIDs(
             tp->rb->session, userLogin->userId, &savedEnvGUIDs);
         *savePtr = savedEnvGUIDs;
-
-        apr_dbd_row_t* envRow = 0;
-        if(0 == apr_dbd_get_row(driver, pool, savedEnvGUIDs, &envRow, -1)) {
-            const char* savedEnvGUID = apr_dbd_get_entry(driver, envRow, 0);
-            if(!savedEnvGUID) {
-                // No GUID for this record.
-                continue;
-            }
-            return savedEnvGUID;
-        }
-        else {
-            return 0;
-        }
     }
+
+    apr_dbd_row_t* envRow = 0;
+    if(0 != apr_dbd_get_row(tp->rb->session->dbd->driver, tp->pool, savedEnvGUIDs, &envRow, -1)) {
+        return 0;
+    }
+    return (void*)apr_dbd_get_entry(tp->rb->session->dbd->driver, envRow, 0);
 }
 
-static void* savedEnvironments(rainback_Template* tp, apr_hash_t* context, void** savePtr)
+static void* savedEnvironments(rainback_Template* tp, rainback_Context* context, void** savePtr, void*dataPtr)
 {
-    if(*savePtr) {
-        // Continue.
+    parsegraph_user_login* userLogin = dataPtr;
+    apr_dbd_results_t* savedEnvGUIDs = *savePtr;
+    if(!savedEnvGUIDs) {
+        parsegraph_EnvironmentStatus erv = parsegraph_getSavedEnvironmentGUIDs(
+            tp->rb->session, userLogin->userId, &savedEnvGUIDs);
+        *savePtr = savedEnvGUIDs;
     }
-    else {
-        // Initialize.
+
+    apr_dbd_row_t* envRow = 0;
+    if(0 != apr_dbd_get_row(tp->rb->session->dbd->driver, tp->pool, savedEnvGUIDs, &envRow, -1)) {
+        return 0;
     }
+    return (void*)apr_dbd_get_entry(tp->rb->session->dbd->driver, envRow, 0);
 }
 
 static void rainback_generateUserpage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
@@ -293,13 +289,13 @@ static void rainback_generateUserpage(rainback_Page* page, mod_rainback* rb, con
     }
 
     // Render the response body from the template.
-    apr_hash_t* context = apr_hash_make(pool);
-    apr_hash_set(context, "title", APR_HASH_KEY_STRING,
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_Context_setString(context, "title",
         (login && login->username) ? login->username : "Rainback");
-    apr_hash_set(context, "username", APR_HASH_KEY_STRING,
+    rainback_Context_setString(context, "username",
         (login && login->username) ? login->username : "Anonymous");
-    apr_hash_set(context, "saved_environments", APR_HASH_KEY_STRING, savedEnvironments);
-    apr_hash_set(context, "owned_environments", APR_HASH_KEY_STRING, ownedEnvironments);
+    rainback_Context_setEnumerator(context, "saved_environments", savedEnvironments, login);
+    rainback_Context_setEnumerator(context, "owned_environments", ownedEnvironments, login);
     rainback_renderTemplate(rb, "userpage.html", context, page);
 
     char buf[8192];
@@ -325,7 +321,7 @@ void rainback_generateHomepage(rainback_Page* page, mod_rainback* rb, const char
     if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
         marla_die(rb->session->server, "Failed to generate request pool.");
     }
-    apr_hash_t* context = apr_hash_make(pool);
+    rainback_Context* context = rainback_Context_new(pool);
     rainback_renderTemplate(rb, "homepage.html", context, page);
 
     char buf[8192];

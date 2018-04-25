@@ -104,8 +104,10 @@ rainback_Page* rainback_getPageByKey(mod_rainback* rb, const char* cacheKey)
 void rainback_removePageFromCache(mod_rainback* rb, const char* cacheKey)
 {
     rainback_Page* page = rainback_getPageByKey(rb, cacheKey);
-    apr_hash_set(rb->cache, page->cacheKey, APR_HASH_KEY_STRING, 0);
-    rainback_Page_unref(page);
+    if(page) {
+        apr_hash_set(rb->cache, page->cacheKey, APR_HASH_KEY_STRING, 0);
+        rainback_Page_unref(page);
+    }
 }
 
 rainback_Page* rainback_getPage(mod_rainback* rb, const char* urlState, const char* url, parsegraph_user_login* login)

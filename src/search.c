@@ -61,8 +61,8 @@ void rainback_generateSearchPage(rainback_Page* page, mod_rainback* rb, const ch
     }
 
     // Render the response body from the template.
-    apr_hash_t* context = apr_hash_make(pool);
-    apr_hash_set(context, "searchterm", APR_HASH_KEY_STRING, esc);
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_Context_setString(context, "searchterm", esc);
     rainback_renderTemplate(rb, "search.html", context, page);
 
     char buf[8192];

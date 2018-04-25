@@ -19,7 +19,7 @@ all: mod_rainback.so test_mod_rainback
 test_mod_rainback: $(SOURCES) test.c
 	$(CC) -I src -o$@ $(CXXFLAGS) -g `pkg-config --cflags openssl apr-1 ncurses` $(SOURCES) test.c -L.. -lmarla -ldl
 
-SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/account.c src/live_environment.c src/environment.c src/authenticate.c src/template.c src/subscribe.c src/search.c src/import.c src/contact.c src/forgot_password.c
+SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/account.c src/live_environment.c src/environment.c src/authenticate.c src/template.c src/subscribe.c src/search.c src/import.c src/contact.c src/forgot_password.c src/context.c
 HEADERS=src/mod_rainback.h
 
 mod_rainback.so: $(SOURCES) $(HEADERS)

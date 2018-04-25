@@ -33,7 +33,7 @@ void rainback_generateContactPage(rainback_Page* page, mod_rainback* rb, parsegr
     }
 
     // Render the response body from the template.
-    apr_hash_t* context = apr_hash_make(pool);
+    rainback_Context* context = rainback_Context_new(pool);
     rainback_renderTemplate(rb, "contact.html", context, page);
 
     char buf[8192];

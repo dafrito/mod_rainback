@@ -157,7 +157,11 @@ mod_rainback* mod_rainback_new(marla_Server* server)
     rb->worldSession = parsegraph_Session_new(pool, dbd);
     rb->worldSession->server = server;
     mod_rainback_prepareDBD(rb->worldSession);
+
+    // Generated pages by cache key.
     rb->cache = apr_hash_make(rb->session->pool);
+
+    // Templates by name.
     rb->templates = apr_hash_make(rb->session->pool);
 
     return rb;

@@ -35,9 +35,9 @@ struct timespec expiry;
 typedef struct rainback_Page rainback_Page;
 
 rainback_Page* rainback_Page_new(const char* cacheKey);
-int rainback_Page_write(rainback_Page* page, void* buf, size_t len);
-int rainback_Page_append(rainback_Page* page, void* buf, size_t len);
-int rainback_Page_prepend(rainback_Page* page, void* buf, size_t len);
+int rainback_Page_write(rainback_Page* page, const void* buf, size_t len);
+int rainback_Page_append(rainback_Page* page, const void* buf, size_t len);
+int rainback_Page_prepend(rainback_Page* page, const void* buf, size_t len);
 void rainback_Page_ref(rainback_Page* page);
 void rainback_Page_unref(rainback_Page* page);
 void rainback_Page_endHead(rainback_Page* page);
@@ -51,6 +51,96 @@ void rainback_generatePage(rainback_Page* page, mod_rainback* rb, const char* ur
 rainback_Page* rainback_getPage(mod_rainback* rb, const char* urlState, const char* url, parsegraph_user_login* login);
 rainback_Page* rainback_getPageByKey(mod_rainback* rb, const char* cacheKey);
 void rainback_removePageFromCache(mod_rainback* rb, const char* cacheKey);
+
+// Template and context
+enum rainback_VariableType {
+rainback_VariableType_STRING,
+rainback_VariableType_ENUMERATOR,
+rainback_VariableType_HASH,
+rainback_VariableType_BLANK
+};
+
+struct rainback_TemplateStep;
+typedef struct rainback_TemplateStep rainback_TemplateStep;
+struct rainback_Template;
+typedef struct rainback_Template rainback_Template;
+
+struct rainback_Context {
+apr_hash_t* vars;
+apr_pool_t* pool;
+struct rainback_Context* parent;
+};
+typedef struct rainback_Context rainback_Context;
+
+struct rainback_Variable {
+enum rainback_VariableType type;
+const char* name;
+union {
+const char* s;
+rainback_Context* h;
+struct {
+void*(*func)(rainback_Template*, rainback_Context*, void**, void*);
+void* data;
+} e;
+} data;
+};
+typedef struct rainback_Variable rainback_Variable;
+rainback_Variable* rainback_Variable_new(rainback_Context* ctx, const char* name);
+void rainback_Variable_clear(rainback_Variable* var);
+
+struct rainback_TemplateStep {
+void(*render)(mod_rainback*, rainback_Page*, rainback_Context*, void*);
+void* renderData;
+rainback_TemplateStep* nextStep;
+};
+
+struct rainback_TemplateProcessor {
+void(*templateCommand)(rainback_Template* template, const char* command, void* procData);
+void(*addStep)(rainback_Template* template, rainback_TemplateStep*, void* procData);
+void* procData;
+struct rainback_TemplateProcessor* prevProcessor;
+};
+typedef struct rainback_TemplateProcessor rainback_TemplateProcessor;
+
+struct rainback_Template {
+apr_pool_t* pool;
+const char* path;
+mod_rainback* rb;
+rainback_TemplateProcessor* processor;
+rainback_TemplateStep* firstStep;
+rainback_TemplateStep* lastStep;
+marla_FileEntry* fe;
+rainback_Page* renderedPage;
+};
+
+enum TemplateParseStage {
+TemplateParseStage_STATIC,
+TemplateParseStage_COMMAND
+};
+
+rainback_Template* rainback_Template_new(mod_rainback* rb);
+void rainback_Template_parseString(rainback_Template* te, unsigned char* str);
+void rainback_Template_parseFile(rainback_Template* te, const char* path, const char* watchpath);
+void rainback_Template_destroy(rainback_Template* te);
+void rainback_Template_stringContent(rainback_Template* te, const char* content);
+void rainback_Template_mappedContent(rainback_Template* te, const char* key);
+void rainback_renderTemplate(mod_rainback* rb, const char* name, rainback_Context* context, rainback_Page* page);
+void rainback_Template_render(rainback_Template* te, rainback_Context* context, rainback_Page* page);
+
+rainback_Context* rainback_Context_new(apr_pool_t* pool);
+rainback_Variable* rainback_Context_getVariable(rainback_Context* ctx, const char* name);
+void rainback_Context_setVariable(rainback_Context* ctx, rainback_Variable* v);
+const char* rainback_Context_getString(rainback_Context* ctx, const char* name);
+void rainback_Context_setString(rainback_Context* ctx, const char* name, const char* value);
+void rainback_Context_setHash(rainback_Context* ctx, const char* name, rainback_Context* hash);
+void rainback_Context_setEnumerator(rainback_Context* ctx, const char* name, void*(*enumerator)(rainback_Template*, rainback_Context*, void**, void*), void* extra);
+rainback_Context* rainback_Context_getHash(rainback_Context* ctx, const char* name);
+void rainback_Context_setParent(rainback_Context* ctx, rainback_Context* par);
+void rainback_Context_remove(rainback_Context* context, const char* name);
+
+typedef void*(*rainback_Enumerator)(rainback_Template*, rainback_Context*, void**, void*);
+rainback_Enumerator rainback_Context_getEnumerator(rainback_Context* ctx, const char* name, void** savePtr);
+void rainback_Context_blank(rainback_Context* ctx, const char* name);
 
 // Login
 struct rainback_LoginResponse;
@@ -201,52 +291,6 @@ rainback_AuthenticateResponse* rainback_AuthenticateResponse_new(marla_Request* 
 void rainback_AuthenticateResponse_destroy(rainback_AuthenticateResponse* resp);
 void rainback_authenticateHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
 
-struct rainback_TemplateStep;
-typedef struct rainback_TemplateStep rainback_TemplateStep;
-struct rainback_Template;
-typedef struct rainback_Template rainback_Template;
-
-struct rainback_TemplateStep {
-void(*render)(mod_rainback*, rainback_Page*, apr_hash_t*, void*);
-void* renderData;
-rainback_TemplateStep* nextStep;
-};
-
-struct rainback_TemplateProcessor {
-void(*templateCommand)(rainback_Template* template, const char* command, void* procData);
-void(*addStep)(rainback_Template* template, rainback_TemplateStep*, void* procData);
-void* procData;
-struct rainback_TemplateProcessor* prevProcessor;
-};
-typedef struct rainback_TemplateProcessor rainback_TemplateProcessor;
-
-struct rainback_Template {
-apr_pool_t* pool;
-const char* path;
-mod_rainback* rb;
-rainback_TemplateProcessor* processor;
-rainback_TemplateStep* firstStep;
-rainback_TemplateStep* lastStep;
-marla_FileEntry* fe;
-rainback_Page* renderedPage;
-};
-
-enum TemplateParseStage {
-TemplateParseStage_STATIC,
-TemplateParseStage_COMMAND
-};
-
-// Template
-rainback_Template* rainback_Template_new(mod_rainback* rb);
-void rainback_Template_parseString(rainback_Template* te, unsigned char* str);
-void rainback_Template_parseFile(rainback_Template* te, const char* path, const char* watchpath);
-rainback_TemplateStep* rainback_makeTemplateStep(rainback_Template* te);
-void rainback_Template_destroy(rainback_Template* te);
-void rainback_Template_stringContent(rainback_Template* te, const char* content);
-void rainback_Template_mappedContent(rainback_Template* te, const char* key);
-void rainback_renderTemplate(mod_rainback* rb, const char* name, apr_hash_t* context, rainback_Page* page);
-void rainback_Template_render(rainback_Template* te, apr_hash_t* context, rainback_Page* page);
-
 struct rainback_SearchResponse;
 typedef struct rainback_SearchResponse rainback_SearchResponse;
 rainback_SearchResponse* rainback_SearchResponse_new(marla_Request* req, mod_rainback* rb);
@@ -277,11 +321,5 @@ rainback_ContactResponse* rainback_ContactResponse_new(marla_Request* req, mod_r
 void rainback_ContactResponse_destroy(rainback_ContactResponse* resp);
 void rainback_generateContactPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login);
 void rainback_ContactHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
-
-enum rainback_VariableType {
-rainback_VariableType_STRING,
-rainback_VariableType_ENUMERABLE,
-rainback_VariableType_HASH
-};
 
 #endif // mod_rainback_INCLUDED

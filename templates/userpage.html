@@ -31,11 +31,15 @@
     <input type="hidden" name="action" value="parsegraph_createEnvironment">
     <input style="font-size: 1.5em" type="submit" value="Create New Environment">
     </form>
-    </div>
     <!-- Saved - All environments saved by the authenticated user -->
-    <!-- < % foreach env in saved_environments %>
-        < % show_env env %>
-    < % endfor %> -->
+    <% foreach env in saved_environments %>
+    <% if first %>
+    <h3>Saved environments</h3>
+    <ul>
+    <% endif %>
+        <li><a href="/environment/<%=env%>"><%=env%></a>
+    <% if last %></ul><% endif %>
+    <% endfor %>
     <!-- Invited - All invites for this user.
     // Online - All friends who are online.
     // Administration - All environments flagged 'admin' if the user is also an administrator.
@@ -50,16 +54,22 @@
     // Most Popular - X most popular environments (If there are at least X environments and at least Y hits for any environment.)
     // Private - All environments private to the user if there are any non-public environments with a permission set for the authenticated user. -->
     <!-- Owned - All environments owned by the user if there are any environments owned by the authenticated user. -->
-    <!-- < % foreach env in owned_environments %>
-        < % show_env env %>
-    < % endfor %> -->
+    <% foreach env in owned_environments %>
+    <% if first %>
+    <h3>Owned environments</h3>
+    <ul>
+    <% endif %>
+        <li><a href="/environment/<%=env%>"><%=env%></a>
+    <% if last %>
+    </ul>
+    <% endif %>
+    <% endfor %>
     <!-- Published - All environments published by the user if there are any public environments owned by the authenticated user. -->
+    </div>
 </main>
 <div style="clear: both"></div>
 <div style="display: block; text-align: center; margin: 1em 0">
-    <div class=slot style="display: inline-block;">
-        &copy; 2018 <a href="https://rainback.com">Rainback, Inc.</a> All rights reserved. <a href=/contact><span class="bud">Contact Us</span></a>
-    </div>
+    <% include footer.html %>
 </div>
 </body>
 </html>

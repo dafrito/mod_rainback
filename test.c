@@ -7,12 +7,13 @@ char numbuf[16];
 int c;
 };
 
-static void* countSome(rainback_Template* tp, apr_hash_t* context, void** savePtr)
+static void* countSome(rainback_Template* tp, rainback_Context* context, void** savePtr, void* iterPtr)
 {
+    long max = (long)iterPtr;
     struct counter* p = 0;
     if(*savePtr) {
         p = *savePtr;
-        if(p->c >= 10) {
+        if(p->c >= max) {
             // Terminate.
             return 0;
         }
@@ -30,6 +31,42 @@ static void* countSome(rainback_Template* tp, apr_hash_t* context, void** savePt
     return p->numbuf;
 }
 
+void test_basic_template(mod_rainback* rb)
+{
+    rainback_Template* te = rainback_Template_new(rb);
+    rainback_Template_parseFile(te, "test.html", rb->session->server->dataRoot);
+
+    rainback_Context* ctx = rainback_Context_new(rb->session->pool);
+    rainback_Context_setString(ctx, "title", "Rainback");
+    rainback_Context_setString(ctx, "content", "No time");
+    rainback_Context_setEnumerator(ctx, "list", countSome, (void*)10);
+
+    rainback_Page* page = rainback_Page_new(0);
+    rainback_Template_render(te, ctx, page);
+    write(2, page->data, page->length);
+    rainback_Page_unref(page);
+
+    rainback_Template_destroy(te);
+}
+
+void test_template(mod_rainback* rb)
+{
+    rainback_Template* te = rainback_Template_new(rb);
+    rainback_Template_parseFile(te, "test.html", rb->session->server->dataRoot);
+
+    rainback_Context* ctx = rainback_Context_new(rb->session->pool);
+    rainback_Context_setString(ctx, "title", "Rainback");
+    rainback_Context_setString(ctx, "content", "No time");
+    rainback_Context_setEnumerator(ctx, "list", countSome, (void*)10);
+
+    rainback_Page* page = rainback_Page_new(0);
+    rainback_Template_render(te, ctx, page);
+    write(2, page->data, page->length);
+
+    rainback_Template_destroy(te);
+    rainback_Page_unref(page);
+}
+
 int main()
 {
     apr_initialize();
@@ -37,46 +74,8 @@ int main()
     marla_Server_init(&server);
 
     mod_rainback* rb = mod_rainback_new(&server);
-
-    rainback_Template* te = rainback_Template_new(rb);
-    unsigned char* f = strdup(
-    "<!DOCTYPE html>\n"
-    "<html>\n"
-    "<head>\n"
-    "    <title><%=title%></title>\n"
-    "</head>\n"
-    "<body>\n"
-    "<p><%=content%></p>\n"
-    "<ul>\n"
-    "<% foreach v in list %>"
-    "    <li>\n"
-    "    <p><%=v%></p>\n"
-    "    <ul>\n"
-        "<% foreach p in list %>"
-    "        <li><%=p%></li>\n"
-        "<% endfor %>"
-    "    </ul>\n"
-    "    </li>\n"
-    "<% endfor %>"
-    "</ul>\n"
-    "</body>\n"
-    "</html>\n");
-    //rainback_Template_parseString(te, f);
-    rainback_Template_parseFile(te, "test.html", server.dataRoot);
-
-    apr_hash_t* h = apr_hash_make(rb->session->pool);
-
-    apr_hash_set(h, "title", APR_HASH_KEY_STRING, "Rainback");
-    apr_hash_set(h, "content", APR_HASH_KEY_STRING, "No time.");
-    apr_hash_set(h, "list", APR_HASH_KEY_STRING, countSome);
-
-    rainback_Page* page = rainback_Page_new(0);
-    rainback_Template_render(te, h, page);
-    write(2, page->data, page->length);
-
-    rainback_Template_destroy(te);
-    free(f);
-    rainback_Page_unref(page);
+    test_template(rb);
+    test_basic_template(rb);
     mod_rainback_destroy(rb);
     marla_Server_free(&server);
     apr_terminate();

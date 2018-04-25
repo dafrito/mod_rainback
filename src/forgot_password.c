@@ -29,11 +29,12 @@ void rainback_generateForgotPasswordPage(rainback_Page* page, mod_rainback* rb, 
     }
 
     // Render the response body from the template.
-    apr_hash_t* context = apr_hash_make(pool);
-    apr_hash_set(context, "title", APR_HASH_KEY_STRING,
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_Context_setString(context, "title",
         (login && login->username) ? login->username : "Rainback");
-    apr_hash_set(context, "username", APR_HASH_KEY_STRING,
+    rainback_Context_setString(context, "username",
         (login && login->username) ? login->username : "Anonymous");
+    rainback_renderTemplate(rb, "import.html", context, page);
     rainback_renderTemplate(rb, "forgot_password.html", context, page);
 
     char buf[8192];
