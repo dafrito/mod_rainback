@@ -2,7 +2,7 @@ Name: @PACKAGE_NAME@
 
 Version:	@PACKAGE_VERSION@
 Release:	@PACKAGE_RELEASE@%{?dist}
-Summary: rainback.com HTML
+Summary: rainback.com Marla module
 
 License:	Apache license 2.0
 URL:		@PACKAGE_URL@
@@ -12,7 +12,7 @@ BuildArch:	x86_64
 Requires:   apr-devel
 
 %description
-Module with Marla HTML routes for rainback.com.
+Module with Marla HTML and WebSocket routes for rainback.com.
 
 %prep
 %setup -q
@@ -25,8 +25,9 @@ make
 %install
 mkdir -p %{buildroot}/%{_libdir}
 cp mod_rainback.so %{buildroot}/%{_libdir}
-cp templates/*.html %{buildroot}/%{_datadir}/parsegraph/templates/*
+mkdir -p %{buildroot}/%{_datadir}/parsegraph/data
+cp templates/*.html %{buildroot}/%{_datadir}/parsegraph/data
 
 %files
 %{_libdir}/mod_rainback.so
-%{_datadir}/parsegraph/templates/*
+%{_datadir}/parsegraph/data

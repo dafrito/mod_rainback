@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rainback</title>
+    <link rel="stylesheet" type="text/css" href="/rainback.css">
+    <link rel="icon" type="image/png" href="/favicon.png" sizes="16x16">
+</head>
+<body>
+<nav>
+    <p style="text-align: center">
+    <a href=/><img id=logo src="/nav-side-logo.png"></img></a>
+    </p>
+    <div style="text-align: center">
+    </div>
+    <p style="text-align: center">
+    </p>
+</nav>
+<main>
+    <div class=links>
+        <form id=search action="/search">
+        <input name=q></input> <input type=submit value=Search></input>
+        </form>
+    </div>
+    <div class=block style="clear:both">
+        <h1><%=status_code%></h1>
+        <p><%=reason%></p>
+        <p>Return to the <a href="/">homepage.</a></p>
+        </div>
+</main>
+<div style="clear: both"></div>
+<div style="display: block; text-align: center; margin: 1em 0">
+    <div class=slot style="display: inline-block;">
+        &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved. <a href=/contact><span class=\"bud\">Contact Us</span></a>
+    </div>
+</div>
+</body>
+</html>

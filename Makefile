@@ -6,8 +6,8 @@ USER=$(shell whoami)
 UID=$(shell id -u `whoami`)
 GID=$(shell id -g `whoami`)
 PACKAGE_NAME=mod_rainback
-PACKAGE_VERSION=1.3
-PACKAGE_RELEASE=16
+PACKAGE_VERSION=1.4
+PACKAGE_RELEASE=1
 PACKAGE_URL=rainback.com
 build_cpu=x86_64
 
@@ -16,8 +16,8 @@ CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -l
 all: mod_rainback.so test_mod_rainback
 .PHONY: all
 
-test_mod_rainback: $(SOURCES) test.c
-	$(CC) -I src -o$@ $(CXXFLAGS) -g `pkg-config --cflags openssl apr-1 ncurses` $(SOURCES) test.c -L.. -lmarla -ldl
+src/test_mod_rainback: $(SOURCES) src/runtest.c
+	$(CC) -I src -o$@ $(CXXFLAGS) -g `pkg-config --cflags openssl apr-1 ncurses` $(SOURCES) src/runtest.c -L.. -lmarla -ldl
 
 SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/account.c src/live_environment.c src/environment.c src/authenticate.c src/template.c src/subscribe.c src/search.c src/import.c src/contact.c src/forgot_password.c src/context.c
 HEADERS=src/mod_rainback.h
@@ -29,12 +29,9 @@ clean:
 	rm -f test_mod_rainback mod_rainback.so $(PACKAGE_NAME).spec rpm.sh $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz
 .PHONY: clean
 
-check: mod_rainback.so runtest
-	./runtest
+check: mod_rainback.so src/test_mod_rainback
+	cd src && ./test_mod_rainback
 .PHONY: check
-
-runtest: src/runtest.c
-	$(CC) -I src -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` $^
 
 rpm.sh: src/rpm.sh.in
 	cp -f $< $@-wip
@@ -56,7 +53,7 @@ $(PACKAGE_NAME).spec: src/rpm.spec.in
 	mv $@-wip $@
 
 $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz: $(SOURCES) $(HEADERS) Makefile
-	tar --transform="s'^'$(PACKAGE_NAME)-$(PACKAGE_VERSION)/'g" -cz -f $@ $^
+	tar --transform="s'^'$(PACKAGE_NAME)-$(PACKAGE_VERSION)/'g" -cz -f $@ test.c test.html foot.html templates/ $^
 
 dist-gzip: $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz $(PACKAGE_NAME).spec
 .PHONY: dist-gzip

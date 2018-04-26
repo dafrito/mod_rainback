@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><title>Rainback</title>
+<link rel="stylesheet" href="/sga.css"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<script src="/parsegraph-1.3.js"></script>
+<script src="/parsegraph-widgets-1.3.js"></script>
+</head>
+<body>
+<script>
+GUID = document.URL.substring(document.URL.lastIndexOf("/") + 1);
+SGA = null;
+document.addEventListener("DOMContentLoaded", function(event) {
+    var sga = new parsegraph_SingleGraphApplication(GUID);
+    sga.setCameraName("parsegraph-environment-" + GUID);
+    SGA = sga;
+    sga.createSessionNode = function(graph, userLogin) {
+        var car = new parsegraph_Caret('bu');
+        car.setGlyphAtlas(graph.glyphAtlas());
+        //car.label("Hello, " + userLogin.username + ", from " + GUID + ".");
+        return car.node();
+    };
+    sga.start(document.body);
+});
+</script>
+</body></html>

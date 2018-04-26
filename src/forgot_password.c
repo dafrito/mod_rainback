@@ -30,11 +30,6 @@ void rainback_generateForgotPasswordPage(rainback_Page* page, mod_rainback* rb, 
 
     // Render the response body from the template.
     rainback_Context* context = rainback_Context_new(pool);
-    rainback_Context_setString(context, "title",
-        (login && login->username) ? login->username : "Rainback");
-    rainback_Context_setString(context, "username",
-        (login && login->username) ? login->username : "Anonymous");
-    rainback_renderTemplate(rb, "import.html", context, page);
     rainback_renderTemplate(rb, "forgot_password.html", context, page);
 
     char buf[8192];

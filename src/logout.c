@@ -33,240 +33,104 @@ void rainback_LogoutResponse_destroy(rainback_LogoutResponse* resp)
 
 void rainback_generateLogoutPage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
 {
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Logout from Rainback</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Logout from Rainback</h1>"
-        "<form method=post style='text-align: center'>"
-        "<input type=submit value='Log out'/>"
-        "</form>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    rainback_Context* context = rainback_Context_new(pool);
+    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
+    if(login && login->username) {
+        memset(encodedUsername, 0, sizeof(encodedUsername));
+        apr_escape_entity(encodedUsername, login->username, APR_ESCAPE_STRING, 1, 0);
+        rainback_Context_setString(context, "username", encodedUsername);
+    }
+    rainback_renderTemplate(rb, "logout.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 void rainback_generateNotLoggedInPage(rainback_Page* page, mod_rainback* rb)
 {
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Not logged in</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Not logged in</h1>"
-        "<p>You are not logged in.</p>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_renderTemplate(rb, "not_logged_in.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 303 See other\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "Location: /\r\n"
         "\r\n",
-        bodylen,
-        rb->session->server->using_ssl ? "Secure;" : ""
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 void rainback_generateLogoutSucceededPage(rainback_Page* page, mod_rainback* rb)
 {
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Logged out</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Logged out</h1>"
-        "<p>You have been logged out and are being redirected to the homepage.</p>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_renderTemplate(rb, "logout_succeeded.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 303 See other\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "Set-Cookie: session=;HttpOnly;%sMax-Age=0;Version=1\r\n"
         "Location: /\r\n"
         "\r\n",
-        bodylen,
+        page->length,
         rb->session->server->using_ssl ? "Secure;" : ""
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 void rainback_generateLogoutFailedPage(rainback_Page* page, mod_rainback* rb)
 {
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Logout failed</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Logout failed</h1>"
-        "<p>The server failed to log you out.</p>"
-        "<form method=post style='text-align: center'>"
-        "<input type=submit value=\"Log out\"><br/>"
-        "</form>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_renderTemplate(rb, "logout_failed.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 500 Server error\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 static marla_WriteResult readRequestBody(marla_Request* req, marla_WriteEvent* we)

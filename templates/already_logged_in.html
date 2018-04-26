@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Forgot password</title>
-    <link rel="stylesheet" type="text/css" href="rainback.css">
-    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
-    <style>
+<title>Login to Rainback</title>
+<link rel="stylesheet" type="text/css" href="rainback.css">
+<link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+<style>
 #login {
 width: 50%;
 margin: auto;
@@ -20,20 +20,17 @@ box-sizing: border-box;
 </style>
 </head>
 <body>
-<nav>
     <p style="text-align: center">
     <a href=/><img id=logo src="nav-side-logo.png"></img></a>
     </p>
-</nav>
-<main>
-    <div class=block style="clear:both; overflow: hidden">
-        <h1>Forgot password</h1>
-        <p>Insert your username or email to generate a new password.</p>
-        <form method=post style="display: inline-block">
-            <label for=username>Username or email:</label><input type=text name=username><br/>
-            <input type=submit value="Log out">
+    <div class=block id=login style="background-color: orange; border-color: yellow">
+        <h1>Already logged in</h1>
+        <p>You are already logged in as <%=username%>.</p>
+        <form method=post style='text-align: center'>
+        <input type=submit value='Log out'/>
         </form>
-</main>
+    </div>
+    </div>
 <div style="clear: both"></div>
 <div style="display: block; text-align: center; margin: 1em 0">
     <div class=slot style="display: inline-block;">

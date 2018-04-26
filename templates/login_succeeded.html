@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Forgot password</title>
+    <title>Login succeeded</title>
     <link rel="stylesheet" type="text/css" href="rainback.css">
     <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
     <style>
@@ -20,20 +20,13 @@ box-sizing: border-box;
 </style>
 </head>
 <body>
-<nav>
-    <p style="text-align: center">
-    <a href=/><img id=logo src="nav-side-logo.png"></img></a>
-    </p>
-</nav>
-<main>
-    <div class=block style="clear:both; overflow: hidden">
-        <h1>Forgot password</h1>
-        <p>Insert your username or email to generate a new password.</p>
-        <form method=post style="display: inline-block">
-            <label for=username>Username or email:</label><input type=text name=username><br/>
-            <input type=submit value="Log out">
-        </form>
-</main>
+<p style="text-align: center">
+<a href=/><img id=logo src="nav-side-logo.png"></img></a>
+</p>
+<div class=block id=login>
+    <h1>Login succeeded</h1>
+    Welcome, <%=username%><p>You are being redirected to your userpage.</p>
+</div>
 <div style="clear: both"></div>
 <div style="display: block; text-align: center; margin: 1em 0">
     <div class=slot style="display: inline-block;">

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login to Rainback</title>
+<link rel="stylesheet" type="text/css" href="rainback.css">
+<link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+<style>
+#login {
+width: 50%;
+margin: auto;
+box-sizing: border-box;
+}
+
+@media only screen and (max-width: 600px) {
+#login {
+width: 100%;
+box-sizing: border-box;
+}
+}
+</style>
+</head>
+<body>
+    <p style="text-align: center">
+    <a href=/><img id=logo src="nav-side-logo.png"></img></a>
+    </p>
+    <div class=block id=login style="background-color: orange; border-color: yellow">
+        <h1>Login to Rainback</h1>
+        <p>A server error occurred while logging in.</p>
+        <form method=post>
+        <div><label for=username>Username:</label><input type=text name=username value="<%=username%>"></div>
+        <div><label for=password>Password:</label><input type=password name=password></div>
+        <div><label for=login></label><input type=submit value="Log in" style="background: greenyellow"> <a href="/signup"><span class=bud style="background: gold">Sign up</span></a></div>
+        </form>
+    </div>
+    </div>
+<div style="clear: both"></div>
+<div style="display: block; text-align: center; margin: 1em 0">
+    <div class=slot style="display: inline-block;">
+        &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>
+    </div>
+</div>
+</body>
+</html>

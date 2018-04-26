@@ -31,334 +31,116 @@ void rainback_LoginResponse_destroy(rainback_LoginResponse* resp)
     free(resp);
 }
 
-void rainback_generateLoginPage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
+void rainback_generateNamedLoginPage(const char* statusLine, const char* templateName, rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login, char* username)
 {
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Login to Rainback</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Login to Rainback</h1>"
-        "<form method=post>"
-        "<div><label for=username>Username:</label><input type=text name=username></div>"
-        "<div><label for=password>Password:</label><input type=password name=password></div>"
-        "<div><label for=login></label><input type=submit value=\"Log in\" style=\"background: greenyellow\"> <a href=\"/signup\"><span class=bud style=\"background: gold\">Sign up</span></a></div>"
-        "</form>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    rainback_Context* context = rainback_Context_new(pool);
+
+    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
+    if(username) {
+        memset(encodedUsername, 0, sizeof(encodedUsername));
+        apr_escape_entity(encodedUsername, username, APR_ESCAPE_STRING, 1, 0);
+        rainback_Context_setString(context, "username", encodedUsername);
+    }
+    rainback_renderTemplate(rb, templateName, context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
-        "HTTP/1.1 200 OK\r\n"
+    int len = snprintf(buf, sizeof buf,
+        "HTTP/1.1 %s\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        statusLine,
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
+}
+
+void rainback_generateLoginPage(rainback_Page* page, mod_rainback* rb, const char* pageState, parsegraph_user_login* login)
+{
+    rainback_generateNamedLoginPage("200 OK", "login.html", page, rb, login, 0);
+}
+
+void rainback_generateBadUserOrPasswordPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login, char* username)
+{
+    rainback_generateNamedLoginPage("403 Forbidden", "bad_password.html", page, rb, login, username);
 }
 
 void rainback_generateAlreadyLoggedInPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login)
 {
-    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
-    memset(encodedUsername, 0, sizeof(encodedUsername));
-    apr_escape_entity(encodedUsername, login->username, APR_ESCAPE_STRING, 1, 0);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
 
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Already logged in</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Already logged in</h1>"
-        "<p>You are already logged in as %s.</p>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>",
-    encodedUsername
-    );
-    size_t bodylen = strlen(body);
+    rainback_Context* context = rainback_Context_new(pool);
+    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
+    if(login && login->username) {
+        memset(encodedUsername, 0, sizeof(encodedUsername));
+        apr_escape_entity(encodedUsername, login->username, APR_ESCAPE_STRING, 1, 0);
+        rainback_Context_setString(context, "username", encodedUsername);
+    }
+    rainback_renderTemplate(rb, "already_logged_in.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 303 See other\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "Location: /\r\n"
         "\r\n",
-        bodylen,
-        parsegraph_constructSessionString(rb->session,
-            login->session_selector,
-            login->session_token
-        ),
-        rb->session->server->using_ssl ? "Secure;" : ""
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 void rainback_generateLoginSucceededPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login)
 {
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Login succeeded</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-"<p style=\"text-align: center\">"
-"<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-"</p>"
-"<div class=block id=login>"
-    "<h1>Login succeeded</h1>"
-    "<p>You are being redirected to your userpage.</p>"
-"</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>"
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+
+    rainback_Context* context = rainback_Context_new(pool);
+    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
+    if(login && login->username) {
+        memset(encodedUsername, 0, sizeof(encodedUsername));
+        apr_escape_entity(encodedUsername, login->username, APR_ESCAPE_STRING, 1, 0);
+        rainback_Context_setString(context, "username", encodedUsername);
+    }
+    rainback_renderTemplate(rb, "login_succeeded.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 303 See other\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "Set-Cookie: session=%s;HttpOnly;%sMax-Age=315360000;Version=1\r\n"
         "Location: /\r\n"
         "\r\n",
-        bodylen,
+        page->length,
         parsegraph_constructSessionString(rb->session,
             login->session_selector,
             login->session_token
         ),
         rb->session->server->using_ssl ? "Secure;" : ""
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 void rainback_generateLoginFailedPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login, char* username)
 {
-    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
-    memset(encodedUsername, 0, sizeof(encodedUsername));
-    apr_escape_entity(encodedUsername, username, APR_ESCAPE_STRING, 1, 0);
-
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Login failed</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Login failed</h1>"
-        "<p>A server error occurred while logging in.</p>"
-        "<form method=post>"
-        "<div><label for=username>Username:</label><input type=text name=username></div>"
-        "<div><label for=password>Password:</label><input type=password name=password></div>"
-        "<div><label for=login></label><input type=submit value=\"Log in\" style=\"background: greenyellow\"> <a href=\"/signup\"><span class=bud style=\"background: gold\">Sign up</span></a></div>"
-        "</form>"
-    "</div>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>",
-    encodedUsername
-    );
-    size_t bodylen = strlen(body);
-
-    char buf[8192];
-    len = snprintf(buf, sizeof buf,
-        "HTTP/1.1 403 Forbidden\r\n"
-        "Content-Type: text/html\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n",
-        bodylen
-    );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
-}
-
-void rainback_generateBadUserOrPasswordPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login, char* username)
-{
-    char encodedUsername[parsegraph_USERNAME_MAX_LENGTH * 3 + 1];
-    memset(encodedUsername, 0, sizeof(encodedUsername));
-    apr_escape_entity(encodedUsername, username, APR_ESCAPE_STRING, 1, 0);
-
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Login to Rainback</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"favicon.png\" sizes=\"16x16\">"
-    "<style>"
-    "#login {\n"
-    "width: 50%;\n"
-    "margin: auto;\n"
-    "box-sizing: border-box;\n"
-    "}\n"
-    "\n"
-"@media only screen and (max-width: 600px) {\n"
-"#login {\n"
-"width: 100%;\n"
-"box-sizing: border-box;\n"
-"}\n"
-"}\n"
-"</style>"
-"</head>"
-"<body>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div class=block id=login>"
-        "<h1>Login to Rainback</h1>"
-        "<p>The username or password was not recognized.</p>"
-        "<form method=post>"
-        "<div><label for=username>Username:</label><input type=text name=username value=\"%s\"></div>"
-        "<div><label for=password>Password:</label><input type=password name=password></div>"
-        "<div><label for=login></label><input type=submit value=\"Log in\" style=\"background: greenyellow\"> <a href=\"/signup\"><span class=bud style=\"background: gold\">Sign up</span></a></div>"
-        "</form>"
-    "</div>"
-    "</div>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>",
-    encodedUsername,
-    encodedUsername
-    );
-    size_t bodylen = strlen(body);
-
-    char buf[8192];
-    len = snprintf(buf, sizeof buf,
-        "HTTP/1.1 403 Forbidden\r\n"
-        "Content-Type: text/html\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n",
-        bodylen
-    );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_generateNamedLoginPage("500 Server Error", "login_failed.html", page, rb, login, username);
 }
 
 static marla_WriteResult readLoginForm(mod_rainback* rb, marla_Request* req, char* buf, size_t buflen, parsegraph_user_login* login)

@@ -12,62 +12,27 @@ static void rainback_generateKilledPage(rainback_Page* page, mod_rainback* rb, i
     memset(encodedStatusCode, 0, sizeof(encodedStatusCode));
     apr_escape_entity(encodedStatusCode, marla_getDefaultStatusLine(statusCode), APR_ESCAPE_STRING, 1, 0);
 
-    char body[8192];
-    int len = snprintf(body, sizeof body,
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-    "<title>Rainback</title>"
-    "<link rel=\"stylesheet\" type=\"text/css\" href=\"/rainback.css\">"
-    "<link rel=\"icon\" type=\"image/png\" href=\"/favicon.png\" sizes=\"16x16\">"
-"</head>"
-"<body>"
-"<nav>"
-    "<p style=\"text-align: center\">"
-    "<a href=/><img id=logo src=\"/nav-side-logo.png\"></img></a>"
-    "</p>"
-    "<div style=\"text-align: center\">"
-    "</div>"
-    "<p style=\"text-align: center\">"
-    "</p>"
-"</nav>"
-"<main>"
-    "<div class=links>"
-        "<form id=search action=\"/search\">"
-        "<input name=q></input> <input type=submit value=Search></input>"
-        "</form>"
-    "</div>"
-    "<div class=block style=\"clear:both\">"
-        "<h1>%s</h1>"
-        "<p>%s</p>"
-        "<p>Return to the <a href=\"/\">homepage.</a></p>"
-        "</div>"
-"</main>"
-"<div style=\"clear: both\"></div>"
-"<div style=\"display: block; text-align: center; margin: 1em 0\">"
-    "<div class=slot style=\"display: inline-block;\">"
-        "&copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved. <a href=/contact><span class=\"bud\">Contact Us</span></a>"
-    "</div>"
-"</div>"
-"</body>"
-"</html>",
-    encodedStatusCode,
-    encodedReason
-    );
-    size_t bodylen = strlen(body);
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_Context_setString(context, "status_code", encodedStatusCode);
+    rainback_Context_setString(context, "reason", encodedReason);
+    rainback_renderTemplate(rb, "killed.html", context, page);
 
     char buf[8192];
-    len = snprintf(buf, sizeof buf,
+    int len = snprintf(buf, sizeof buf,
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
         statusCode, marla_getDefaultStatusLine(statusCode),
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 rainback_Page* rainback_getKilledPage(mod_rainback* rb, int statusCode, const char* reason)

@@ -32,36 +32,14 @@ void rainback_EnvironmentResponse_destroy(rainback_EnvironmentResponse* resp)
 
 void rainback_generateEnvironmentPage(rainback_Page* page, mod_rainback* rb)
 {
-    char body[8192];
-    int bodylen = snprintf(body, sizeof body,
-        "<!DOCTYPE html><html><head><title>"
-        "Rainback"
-        "</title>"
-        "<link rel=\"stylesheet\" href=\"/sga.css\"/>"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">"
-        "<script src=\"/parsegraph-1.3.js\"></script>"
-        "<script src=\"/parsegraph-widgets-1.3.js\"></script>"
-        "</head>"
-        "<body>"
-        "<script>\n"
-        "GUID = document.URL.substring(document.URL.lastIndexOf(\"/\") + 1);"
+    apr_pool_t* pool;
+    if(apr_pool_create(&pool, rb->session->pool) != APR_SUCCESS) {
+        marla_die(rb->session->server, "Failed to generate request pool.");
+    }
 
-        "SGA = null;\n"
-        "document.addEventListener(\"DOMContentLoaded\", function(event) {\n"
-        "var sga = new parsegraph_SingleGraphApplication(GUID);\n"
-        "sga.setCameraName(\"parsegraph-environment-\" + GUID);\n"
-        "SGA = sga;\n"
-        "sga.createSessionNode = function(graph, userLogin) {\n"
-        "var car = new parsegraph_Caret('bu');\n"
-        "car.setGlyphAtlas(graph.glyphAtlas());\n"
-        //"car.label(\"Hello, \" + userLogin.username + \", from \" + GUID + \".\");"
-        "return car.node();\n"
-        "};\n"
-        "sga.start(document.body);"
-        "});\n"
-        "</script>\n"
-        "</body></html>"
-    );
+    // Render the response body from the template.
+    rainback_Context* context = rainback_Context_new(pool);
+    rainback_renderTemplate(rb, "environment.html", context, page);
 
     char buf[8192];
     int len = snprintf(buf, sizeof buf,
@@ -69,11 +47,11 @@ void rainback_generateEnvironmentPage(rainback_Page* page, mod_rainback* rb)
         "Content-Type: text/html\r\n"
         "Content-Length: %d\r\n"
         "\r\n",
-        bodylen
+        page->length
     );
-    rainback_Page_write(page, buf, len);
-    rainback_Page_endHead(page);
-    rainback_Page_write(page, body, bodylen);
+    rainback_Page_prepend(page, buf, len);
+    page->headBoundary = len;
+    apr_pool_destroy(pool);
 }
 
 static int acceptRequest(marla_Request* req)
