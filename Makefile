@@ -13,7 +13,7 @@ build_cpu=x86_64
 
 CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -laprutil-1 -fPIC -L$(HOME)/lib -lparsegraph
 
-all: mod_rainback.so test_mod_rainback
+all: mod_rainback.so src/test_mod_rainback
 .PHONY: all
 
 src/test_mod_rainback: $(SOURCES) src/runtest.c
@@ -26,7 +26,7 @@ mod_rainback.so: $(SOURCES) $(HEADERS)
 	$(CC) -I src -o$@ $(CXXFLAGS) -shared -g `pkg-config --cflags openssl apr-1 ncurses` $(SOURCES) -L.. -lmarla
 
 clean:
-	rm -f test_mod_rainback mod_rainback.so $(PACKAGE_NAME).spec rpm.sh $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz
+	rm -f src/test_mod_rainback mod_rainback.so $(PACKAGE_NAME).spec rpm.sh $(PACKAGE_NAME)-$(PACKAGE_VERSION).tar.gz
 .PHONY: clean
 
 check: mod_rainback.so src/test_mod_rainback
