@@ -14,22 +14,18 @@
 </nav>
 <main>
     <div class="links">
-        <form id="search" action="/search">
+        <form id="search" style="width: 100%" action="/search">
         <input name="q"></input> <input type="submit" value="Search"></input>
         </form>
-        <form id="logout" method="post" action="/logout" style="display: inline-block"><input type="submit" value="Log out"></form>
-        <a href="/profile"><span class="bud">Profile</span></a>
-        <a href="/import"><span class="bud import-button">Import</span></a>
     </div>
 
     <div class="block" style="clear:both; overflow: hidden">
-    <h1><%=username%></h1>
-    <p>
-    <video controls="true" style="width:100%" src="rainback-on-fedora-from-scratch.webm"></video>
-    <p>
+        <form id="logout" method="post" action="/logout" style="display: inline-block; float: right"><input type="submit" value="Log out"></form>
+    <h1><a href="/profile"><%=username%></a></h1>
     <form method="post">
     <input type="hidden" name="action" value="parsegraph_createEnvironment">
     <input style="font-size: 1.5em" type="submit" value="Create New Environment">
+    <a href="/import"><span class="bud import-button">Import</span></a>
     </form>
     <!-- Saved - All environments saved by the authenticated user -->
     <% foreach env in saved_environments %>
