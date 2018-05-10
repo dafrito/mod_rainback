@@ -20,18 +20,20 @@ box-sizing: border-box;
 </style>
 </head>
 <body>
-<p style="text-align: center">
+  <div class="indexgrid">
+
+    <div class="logo" style="text-align: center">
 <a href=/><img id=logo src="nav-side-logo.png"></img></a>
-</p>
-<div class=block id=login>
-    <h1>Login succeeded</h1>
-    Welcome, <%=username%><p>You are being redirected to your userpage.</p>
 </div>
-<div style="clear: both"></div>
-<div style="display: block; text-align: center; margin: 1em 0">
+<div class="block ; content" id="login">
+    <h2>Login succeeded</h2>
+    Welcome, <%=username%>.<p>You are being redirected to <a href="/">your userpage</a>.</p>
+</div>
+<div class="footer" ; style="display: block; text-align: center; ">
     <div class=slot style="display: inline-block;">
         &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>
     </div>
+</div>
 </div>
 </body>
 </html>

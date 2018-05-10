@@ -17,25 +17,30 @@ width: 100%;
 box-sizing: border-box;
 }
 }
+.button {
+    align-content: center;
+}
 </style>
 </head>
 <body>
-    <p style="text-align: center">
+     <div class="indexgrid">
+    <div class="logo" style="text-align: center">
     <a href=/><img id=logo src="nav-side-logo.png"></img></a>
-    </p>
-    <div class=block id=login style="background-color: orange; border-color: yellow">
-        <h1>Already logged in</h1>
+    </div>
+    <div class="block ; content" id=login style="background-color: orange; border-color: yellow">
+        <h2>Already logged in</h2>
         <p>You are already logged in as <%=username%>.</p>
         <form method=post style='text-align: center'>
+        <div class="button" style="text-align: center" >
         <input type=submit value='Log out'/>
         </form>
     </div>
     </div>
-<div style="clear: both"></div>
-<div style="display: block; text-align: center; margin: 1em 0">
+    <div class="footer" ; style="display: block; text-align: center; ">
     <div class=slot style="display: inline-block;">
         &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>
     </div>
+</div>
 </div>
 </body>
 </html>

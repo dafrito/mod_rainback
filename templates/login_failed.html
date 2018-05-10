@@ -17,27 +17,42 @@ width: 100%;
 box-sizing: border-box;
 }
 }
+
+.button {
+    align-content: center;
+}
 </style>
 </head>
 <body>
-    <p style="text-align: center">
+    <div class="indexgrid">
+
+    <div class="logo" style="text-align: center">
+   
     <a href=/><img id=logo src="nav-side-logo.png"></img></a>
-    </p>
-    <div class=block id=login style="background-color: orange; border-color: yellow">
-        <h1>Login to Rainback</h1>
+    </div>
+    <div class="block ; content" id="login" style="background-color: orange; border-color: yellow">
+        <h2>Login to Rainback</h2>
         <p>A server error occurred while logging in.</p>
-        <form method=post>
-        <div><label for=username>Username:</label><input type=text name=username value="<%=username%>"></div>
-        <div><label for=password>Password:</label><input type=password name=password></div>
-        <div><label for=login></label><input type=submit value="Log in" style="background: greenyellow"> <a href="/signup"><span class=bud style="background: gold">Sign up</span></a></div>
+        <form class="inputstyle" method=post>
+        <div><label class="widelable" for=username>Username:</label><input type=text name=username value="<%=username%>"></div>
+        <div><label class="widelable" for=password>Password:</label><input type=password name=password></div>
+<div style="text-align: center ;>
+         <a href="/forgotpassword">Forgot Password?</a>
+     </div>
+     <div class="button" style="text-align: center" >
+       <input type=submit value="Log in" style="background: greenyellow">
+           <a href="/signup"><span class=bud style="background: gold">Sign up</span></a>
+            </div>
         </form>
     </div>
-    </div>
-<div style="clear: both"></div>
-<div style="display: block; text-align: center; margin: 1em 0">
+    
+<div class="footer" ; style="display: block; text-align: center; ">
     <div class=slot style="display: inline-block;">
         &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>
     </div>
 </div>
+</div>
 </body>
 </html>
+
+      

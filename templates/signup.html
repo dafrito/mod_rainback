@@ -20,23 +20,31 @@ box-sizing: border-box;
 </style>
 </head>
 <body>
-    <p style="text-align: center">
+    <div class="indexgrid">
+
+    <div class="logo" style="text-align: center">
     <a href=/><img id=logo src="nav-side-logo.png"></img></a>
-    </p>
-    <div class=block id=login>
-        <h1>Sign up for Rainback</h1>
-        <form method=post>
-        <div><label for=username>Username:</label><input type=text name=username></div>
-        <div><label for=password>Password:</label><input type=password name=password></div>
-        <div><label for=password_again>Password (again):</label><input type=password name=password_again></div>
-        <div><label for=signup></label><input name=signup type=submit value="Sign up" style="background: gold"></div>
+    </div>
+    <div class="block ; content" id="login">
+        <h2>Sign up for Rainback</h2>
+        <form class="inputstyle" method=post>
+        <div><label class="widelable" for=username>Username:</label><input type=text name=username></div>
+        <div><label class="widelable" for=password>Password:</label><input type=password name=password></div>
+        <div><label class="widelable" for=password_again>Password (again):</label><input type=password name=password_again></div>
+        <div style="text-align: center;">
+        <input class="widebutton" name=signup type=submit value="Sign up" style="background: gold">
+    </div>
+        <div style="text-align: center;">
+        <a href="/login">Log in</a>
+        </div>
+    </div>
         </form>
     </div>
-<div style="clear: both"></div>
-<div style="display: block; text-align: center; margin: 1em 0">
+    <div class="footer" ; style="display: block; text-align: center; ">
     <div class=slot style="display: inline-block;">
         &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved.</a>
     </div>
+</div>
 </div>
 </body>
 </html>

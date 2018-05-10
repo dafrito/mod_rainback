@@ -5,22 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=no">
     <link rel="stylesheet" type="text/css" href="rainback.css">
     <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+<style>#logo {
+    width:80%;
+
+}
+
+.button {
+    font-size: 10px;
+    height: 30px;
+    padding: 3px 6px !important;
+}
+
+.button2 {
+    font-size: 10px;
+    height: 30px;
+    padding: 3px 6px !important;
+}
+
+</style>
 </head>
 <body>
-<nav>
-    <p style="text-align: center">
+    <div class="indexgrid2">
+
+    <div class="logo" style="text-align: center"> 
+
     <a href=/><img id=logo src="nav-side-logo.png"></img></a>
-    </p>
-</nav>
-    <div class=links>
-        <form id=search action="/search">
-        <input name=q></input> <input type=submit value=Search></input>
+</div>
+<div class="linksearch">
+        <form id=search action="/search" style="text-align: center; width: 300px; display: inline-block;">
+        <input name=q>
+        </input> 
+        <input class="button" ; type=submit value=Search>
+        </input>
         </form>
-        <form id=logout method=post action="/logout" style="display: inline-block"><input type=submit value="Log out"></form>
+</div>
+<div class="blurb">
+        <form id=logout method=post action="/logout" style="width: 100%; display: inline-block ;text-align: right;"><input class="button2" type="submit" value="Log out"></form>
     </div>
-    <div class=block style="clear:both; overflow: hidden">
+    <div class="block content" style="clear:both; overflow: hidden">
         <h1><%=username%></h1>
-<div class=slot style="float: right; padding-left: 1em; padding-bottom: 1em">
+<div class=slot style="float: left; padding-right: 1em; padding-bottom: 1em">
 <b>User Management</b><br/>
 <ul style="margin: 0; margin-top: 1em;">
 <li><a href="/account">User Account</a></li>
@@ -28,7 +52,7 @@
 </ul>
 </div>
 </div>
-<div style="display: block; text-align: center; margin: 1em 0">
+<div class="footer" style="display: block; text-align: center; margin: 1em 0">
     <div class=slot style="display: inline-block;">
         &copy; 2018 <a href="https://rainback.com">Rainback, Inc.</a> All rights reserved. <a href=/contact><span class="bud">Contact Us</span></a>
     </div>
