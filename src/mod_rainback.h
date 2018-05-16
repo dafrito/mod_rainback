@@ -52,6 +52,8 @@ rainback_Page* rainback_getPage(mod_rainback* rb, const char* urlState, const ch
 rainback_Page* rainback_getPageByKey(mod_rainback* rb, const char* cacheKey);
 void rainback_removePageFromCache(mod_rainback* rb, const char* cacheKey);
 
+marla_WriteResult rainback_readForm(marla_Request* req, apr_hash_t* formData, char* buf, size_t len);
+
 // Template and context
 enum rainback_VariableType {
 rainback_VariableType_STRING,
@@ -321,5 +323,39 @@ rainback_ContactResponse* rainback_ContactResponse_new(marla_Request* req, mod_r
 void rainback_ContactResponse_destroy(rainback_ContactResponse* resp);
 void rainback_generateContactPage(rainback_Page* page, mod_rainback* rb, parsegraph_user_login* login);
 void rainback_ContactHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+// o0
+struct rainback_o0Response {
+mod_rainback* rb;
+marla_Ring* input;
+apr_pool_t* pool;
+parsegraph_user_login login;
+int printed_header;
+int remainingo0;
+};
+typedef struct rainback_o0Response rainback_o0Response;
+rainback_o0Response* rainback_o0Response_new(marla_Request* req, mod_rainback* rb);
+void rainback_o0Response_destroy(rainback_o0Response* resp);
+void rainback_o0Handler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
+
+// wave
+struct rainback_WaveResponse {
+mod_rainback* rb;
+marla_Ring* input;
+apr_pool_t* pool;
+parsegraph_user_login login;
+int printed_header;
+int printed_wav_header;
+float lengthSec;
+int sampleRate;
+float baseFreq;
+int numSamples;
+int index;
+int bitsPerSample;
+};
+typedef struct rainback_WaveResponse rainback_WaveResponse;
+rainback_WaveResponse* rainback_WaveResponse_new(marla_Request* req, mod_rainback* rb);
+void rainback_WaveResponse_destroy(rainback_WaveResponse* resp);
+void rainback_waveHandler(struct marla_Request* req, enum marla_ClientEvent ev, void* data, int dataLen);
 
 #endif // mod_rainback_INCLUDED

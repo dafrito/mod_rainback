@@ -11,7 +11,7 @@ PACKAGE_RELEASE=1
 PACKAGE_URL=rainback.com
 build_cpu=x86_64
 
-CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -laprutil-1 -fPIC -L$(HOME)/lib -lparsegraph
+CXXFLAGS=-I $(HOME)/include -I/usr/include/httpd -I/usr/include/apr-1 -lapr-1 -laprutil-1 -fPIC -L$(HOME)/lib -lparsegraph -lm
 
 all: mod_rainback.so src/test_mod_rainback
 .PHONY: all
@@ -19,7 +19,7 @@ all: mod_rainback.so src/test_mod_rainback
 src/test_mod_rainback: $(SOURCES) src/runtest.c
 	$(CC) -I src -o$@ $(CXXFLAGS) -g `pkg-config --cflags openssl apr-1 ncurses` $(SOURCES) src/runtest.c -L.. -lmarla -ldl
 
-SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/account.c src/live_environment.c src/environment.c src/authenticate.c src/template.c src/subscribe.c src/search.c src/import.c src/contact.c src/forgot_password.c src/context.c
+SOURCES=src/module.c src/route.c src/auth.c src/page.c src/generate.c src/homepage.c src/login.c src/logout.c src/killed.c src/signup.c src/profile.c src/account.c src/live_environment.c src/environment.c src/authenticate.c src/template.c src/subscribe.c src/search.c src/import.c src/contact.c src/forgot_password.c src/context.c src/form.c src/o0.c src/wave.c
 HEADERS=src/mod_rainback.h
 
 mod_rainback.so: $(SOURCES) $(HEADERS)

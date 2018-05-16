@@ -91,6 +91,16 @@ void mod_rainback_route(struct marla_Request* req, void* hookData)
         req->handlerData = rainback_ImportResponse_new(req, rb);
         return;
     }
+    if(!strcmp(req->uri, "/o0") || !strcmp(req->uri, "/o0/")) {
+        req->handler = rainback_o0Handler;
+        req->handlerData = rainback_o0Response_new(req, rb);
+        return;
+    }
+    if(!strcmp(req->uri, "/wave") || !strcmp(req->uri, "/wave/")) {
+        req->handler = rainback_waveHandler;
+        req->handlerData = rainback_WaveResponse_new(req, rb);
+        return;
+    }
     if(!strcmp(req->uri, "/environment/live") || !strcmp(req->uri, "/environment/live")) {
         rainback_live_environment_install(rb, req);
         return;
