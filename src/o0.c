@@ -55,9 +55,9 @@ static marla_WriteResult writeRequest(marla_Request* req, marla_WriteEvent* we)
     if(!resp->printed_header) {
         char buf[1024];
         // Limited mode
-        //int len = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n", strlen(text)*resp->remainingo0);
+        int len = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: text/plain\r\n\r\n", strlen(text)*resp->remainingo0);
         // Endless mode
-        int len = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\n");
+        //int len = snprintf(buf, sizeof(buf), "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\n");
         req->close_after_done = 1;
         int nwritten = marla_Connection_write(req->cxn, buf, len);
         if(nwritten < len) {
