@@ -40,7 +40,7 @@ rainback_Page* rainback_getKilledPage(mod_rainback* rb, int statusCode, const ch
     // Generate the cache key.
     char buf[1024];
     memset(buf, 0, sizeof buf);
-    int len = snprintf(buf, sizeof buf, "killed$%d$%s$%s", statusCode, reason);
+    int len = snprintf(buf, sizeof buf, "killed$%d$%s$", statusCode, reason);
     char* cacheKey = buf;
 
     rainback_Page* page = rainback_getPageByKey(rb, cacheKey);
